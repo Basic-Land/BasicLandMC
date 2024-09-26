@@ -1,0 +1,63 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Wed, 25 Sep 2024 21:49:17 +0200
+Subject: [PATCH] load-plugins-from-folder
+
+
+diff --git a/build.gradle.kts b/build.gradle.kts
+index b8cdedc81a2ac5128f2c6ea7eb4d5df22c136748..8e39e777d03a76778a96519d09867a25308d6a6b 100644
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -13,7 +13,7 @@ configurations.named(log4jPlugins.compileClasspathConfigurationName) {
+ val alsoShade: Configuration by configurations.creating
+ 
+ dependencies {
+-    implementation(project(":divinemc-api")) // DivineMC
++    implementation(project(":basiclandmc-api")) // DivineMC
+     // Paper start
+     implementation("org.jline:jline-terminal-jansi:3.21.0")
+     implementation("net.minecrell:terminalconsoleappender:1.3.0")
+diff --git a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
+index 70413fddd23ca1165cb5090cce4fddcb1bbca93f..a9d333698fd882a8683da8f356f9362893f00f69 100644
+--- a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
++++ b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
+@@ -117,6 +117,20 @@ public class PluginInitializerManager {
+         java.util.List<Path> files = ((java.util.List<File>) optionSet.valuesOf("add-plugin")).stream().map(File::toPath).toList();
+         io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.PluginFlagProviderSource.INSTANCE, files);
+ 
++        //BL start
++        @SuppressWarnings("unchecked")
++        java.util.List<Path> pluginList = ((java.util.List<File>) optionSet.valuesOf("add-plugin-dir")).stream()
++            .filter(java.util.Objects::nonNull)
++            .map(File::listFiles)
++            .filter(java.util.Objects::nonNull)
++            .flatMap(java.util.Arrays::stream)
++            .filter(File::isFile)
++            .map(File::toPath)
++            .toList();
++
++        io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.PluginFlagProviderSource.INSTANCE, pluginList);
++        //BL end
++
+         final Set<String> paperPluginNames = new TreeSet<>();
+         final Set<String> legacyPluginNames = new TreeSet<>();
+         LaunchEntryPointHandler.INSTANCE.getStorage().forEach((entrypoint, providerStorage) -> {
+diff --git a/src/main/java/org/bukkit/craftbukkit/Main.java b/src/main/java/org/bukkit/craftbukkit/Main.java
+index 58cecb0253d191410aefac5d3ec18410b8c6728f..2dfe77edb76d5502cfdffda606c0edf31ade2878 100644
+--- a/src/main/java/org/bukkit/craftbukkit/Main.java
++++ b/src/main/java/org/bukkit/craftbukkit/Main.java
+@@ -205,6 +205,14 @@ public class Main {
+                         .defaultsTo("Unknown Server")
+                         .describedAs("Name");
+                 // Paper end
++
++                // BL start
++                acceptsAll(asList("add-plugin-dir", "add-extra-plugin-dir"), "Specify paths to directories containing extra plugin jars to be loaded in addition to those in the plugins folder. This argument can be specified multiple times, once for each extra plugin directory path.")
++                    .withRequiredArg()
++                    .ofType(File.class)
++                    .defaultsTo(new File("extra"))
++                    .describedAs("Directory");
++                // BL end
+             }
+         };
+ 
