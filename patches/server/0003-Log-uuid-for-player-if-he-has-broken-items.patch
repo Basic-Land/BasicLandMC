@@ -1,0 +1,69 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Mon, 30 Sep 2024 18:58:12 +0200
+Subject: [PATCH] Log-uuid-for-player-if-he-has-broken-items
+
+
+diff --git a/src/main/java/net/minecraft/world/entity/player/Inventory.java b/src/main/java/net/minecraft/world/entity/player/Inventory.java
+index abf231e6099cda766d73e67f31234e9f4cbc9545..db71b9b68afa3ed6a4af614ff65d1e7fcd3a710d 100644
+--- a/src/main/java/net/minecraft/world/entity/player/Inventory.java
++++ b/src/main/java/net/minecraft/world/entity/player/Inventory.java
+@@ -521,7 +521,7 @@ public class Inventory implements Container, Nameable {
+         return nbtList;
+     }
+ 
+-    public void load(ListTag nbtList) {
++    public void load(ListTag nbtList, String stringUUID) { // BL - add logging of broken items
+         this.items.clear();
+         this.armor.clear();
+         this.offhand.clear();
+@@ -529,7 +529,18 @@ public class Inventory implements Container, Nameable {
+         for (int i = 0; i < nbtList.size(); ++i) {
+             CompoundTag nbttagcompound = nbtList.getCompound(i);
+             int j = nbttagcompound.getByte("Slot") & 255;
+-            ItemStack itemstack = (ItemStack) ItemStack.parse(this.player.registryAccess(), nbttagcompound).orElse(ItemStack.EMPTY);
++
++            // BL start - log broken items
++            com.mojang.serialization.DataResult<ItemStack> itemStackDataResult = ItemStack.parseGet(this.player.registryAccess(), nbttagcompound);
++            java.util.Optional<ItemStack> result = itemStackDataResult.result();
++            ItemStack itemstack;
++            if (result.isEmpty()) {
++                com.mojang.logging.LogUtils.getLogger().error("Player '{}' has broken item in slot '{}'", stringUUID, j);
++                itemstack = itemStackDataResult.resultOrPartial().orElse(ItemStack.EMPTY);
++            } else {
++                itemstack = result.get();
++            }
++            // BL end - log broken items
+ 
+             if (j >= 0 && j < this.items.size()) {
+                 this.items.set(j, itemstack);
+diff --git a/src/main/java/net/minecraft/world/entity/player/Player.java b/src/main/java/net/minecraft/world/entity/player/Player.java
+index 1a2f20e53e0c9b711ce2c4a1b978451e4bc8a7a4..bc21dcf17c950f218f8481020379bf720415c5a4 100644
+--- a/src/main/java/net/minecraft/world/entity/player/Player.java
++++ b/src/main/java/net/minecraft/world/entity/player/Player.java
+@@ -914,7 +914,7 @@ public abstract class Player extends LivingEntity {
+         this.setUUID(this.gameProfile.getId());
+         ListTag nbttaglist = nbt.getList("Inventory", 10);
+ 
+-        this.inventory.load(nbttaglist);
++        this.inventory.load(nbttaglist, stringUUID); // BL - when player has broken item log it with their UUID
+         this.inventory.selected = nbt.getInt("SelectedItemSlot");
+         this.sleepCounter = nbt.getShort("SleepTimer");
+         this.experienceProgress = nbt.getFloat("XpP");
+diff --git a/src/main/java/net/minecraft/world/item/ItemStack.java b/src/main/java/net/minecraft/world/item/ItemStack.java
+index 24a7e1780ec55ea95195b5478eef66015cb21f72..fd91f900b932205201a49a9f09c0294f1a3cea85 100644
+--- a/src/main/java/net/minecraft/world/item/ItemStack.java
++++ b/src/main/java/net/minecraft/world/item/ItemStack.java
+@@ -350,6 +350,12 @@ public final class ItemStack implements DataComponentHolder {
+         return nbt.isEmpty() ? ItemStack.EMPTY : (ItemStack) ItemStack.parse(registries, nbt).orElse(ItemStack.EMPTY);
+     }
+ 
++    // BL start - special method for logging broken itemstacks
++    public static DataResult<ItemStack> parseGet(HolderLookup.Provider registries, Tag nbt) {
++        return ItemStack.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), nbt);
++    }
++    // BL end
++
+     public boolean isEmpty() {
+         return this == ItemStack.EMPTY || this.item == Items.AIR || this.count <= 0;
+     }
