@@ -5,10 +5,10 @@ Subject: [PATCH] log-plugin-onEnable-load-time
 
 
 diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-index 5ff143af95f26d6c282d607cd5e7a086edd30a6f..a1f21c3776beeb33c2a34bda227f7282c45427ce 100644
+index 57a4d95df6e6044eef01201b494417789090f010..2c09f1ea23a588cdc23e6c13d3181b60e713f605 100644
 --- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 +++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-@@ -604,7 +604,9 @@ public final class CraftServer implements Server {
+@@ -605,7 +605,9 @@ public final class CraftServer implements Server {
  
          for (Plugin plugin : plugins) {
              if ((!plugin.isEnabled()) && (plugin.getDescription().getLoad() == type)) {

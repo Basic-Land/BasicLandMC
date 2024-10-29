@@ -5,10 +5,10 @@ Subject: [PATCH] Build-changes
 
 
 diff --git a/src/main/java/io/papermc/paper/ServerBuildInfo.java b/src/main/java/io/papermc/paper/ServerBuildInfo.java
-index 4d71d7fb74b424e267cf547a4f89d6229ff9e680..1cf0c86f48a44fbc772ed7c93df41f107ea62ca7 100644
+index 6811f38a2eaf614c8237190800a48d101c39cd99..410ef2e801b2c8d46f89ac11c588cbc22263338e 100644
 --- a/src/main/java/io/papermc/paper/ServerBuildInfo.java
 +++ b/src/main/java/io/papermc/paper/ServerBuildInfo.java
-@@ -39,6 +39,13 @@ public interface ServerBuildInfo {
+@@ -40,6 +40,13 @@ public interface ServerBuildInfo {
      Key BRAND_DIVINEMC_ID = Key.key("divinemc", "divinemc");
      // DivineMC end
  

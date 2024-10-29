@@ -5,10 +5,10 @@ Subject: [PATCH] Build-changes
 
 
 diff --git a/build.gradle.kts b/build.gradle.kts
-index 8e39e777d03a76778a96519d09867a25308d6a6b..c924eaec1f25564d7408191f52d21a39d3cd294c 100644
+index 34d69315d10b086efe7d243c8a14e16b3979e9fb..a628aa7cf5b71591e1825b7d12bc500932b08477 100644
 --- a/build.gradle.kts
 +++ b/build.gradle.kts
-@@ -107,14 +107,14 @@ tasks.jar {
+@@ -108,14 +108,14 @@ tasks.jar {
          val gitBranch = git("rev-parse", "--abbrev-ref", "HEAD").getText().trim() // Paper
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",
