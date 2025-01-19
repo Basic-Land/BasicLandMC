@@ -8,36 +8,6 @@ plugins {
 
 val paperMavenPublicUrl = "https://repo.papermc.io/repository/maven-public/"
 
-//paperweight {
-//    serverProject.set(project(":basiclandmc-server"))
-//
-//    remapRepo.set("https://maven.fabricmc.net/")
-//    decompileRepo.set(paperMavenPublicUrl)
-//
-//    useStandardUpstream("divinemc") {
-//        url.set(github("DivineMC", "DivineMC"))
-//        ref.set(providers.gradleProperty("divineRef"))
-//
-//        withStandardPatcher {
-//            apiSourceDirPath.set("DivineMC-API")
-//            serverSourceDirPath.set("DivineMC-Server")
-//
-//            apiPatchDir.set(layout.projectDirectory.dir("patches/api"))
-//            apiOutputDir.set(layout.projectDirectory.dir("BasicLandMC-API"))
-//
-//            serverPatchDir.set(layout.projectDirectory.dir("patches/server"))
-//            serverOutputDir.set(layout.projectDirectory.dir("BasicLandMC-Server"))
-//        }
-//
-//        patchTasks.register("generatedApi") {
-//            isBareDirectory = true
-//            upstreamDirPath = "paper-api-generator/generated"
-//            patchDir = layout.projectDirectory.dir("patches/generated-api")
-//            outputDir = layout.projectDirectory.dir("paper-api-generator/generated")
-//        }
-//    }
-//}
-
 paperweight {
     upstreams.register("divinemc") {
         repo = github("DivineMC", "DivineMC")
@@ -52,6 +22,17 @@ paperweight {
             path = "divinemc-api/build.gradle.kts"
             outputFile = file("basiclandmc-api/build.gradle.kts")
             patchFile = file("basiclandmc-api/build.gradle.kts.patch")
+        }
+        patchRepo("paperApi") {
+            upstreamPath = "paper-api"
+            patchesDir = file("basiclandmc-api/paper-patches")
+            outputDir = file("paper-api")
+        }
+        patchDir("divinemcApi") {
+            upstreamPath = "divinemc-api"
+            excludes = listOf("build.gradle.kts", "build.gradle.kts.patch", "paper-patches")
+            patchesDir = file("basiclandmc-api/divinemc-patches")
+            outputDir = file("divinemc-api")
         }
     }
 }
