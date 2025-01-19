@@ -9,8 +9,10 @@ run
 /basiclandmc-server/src/minecraft
 /paper-server
 /purpur-server
+/divinemc-server
 /basiclandmc-api/build.gradle.kts
 /paper-api
 /purpur-api
+/divinemc-api
 *.jar
 changelog.md
