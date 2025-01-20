@@ -1,13 +1,5 @@
 --- a/divinemc-server/build.gradle.kts
 +++ b/divinemc-server/build.gradle.kts
-@@ -22,7 +_,6 @@
-     // gitFilePatches = true
- 
-     val purpur = forks.register("purpur") {
--        rootDirectory = upstreamsDirectory().map { it.dir("purpur") }
-         upstream.patchDir("paperServer") {
-             upstreamPath = "paper-server"
-             excludes = setOf("src/minecraft", "patches", "build.gradle.kts")
 @@ -46,7 +_,22 @@
          }
      }
@@ -54,7 +46,7 @@
  
  dependencies {
 -    implementation(project(":divinemc-api")) // DivineMC
-+    implementation(project(":basiclandmc-api")) // DivineMC
++    implementation(project(":basiclandmc-api")) // BasiclandMC
      implementation("ca.spottedleaf:concurrentutil:0.0.3")
      implementation("org.jline:jline-terminal-ffm:3.27.1") // use ffm on java 22+
      implementation("org.jline:jline-terminal-jni:3.27.1") // fall back to jni on java 21
