@@ -1,5 +1,13 @@
 --- a/divinemc-server/build.gradle.kts
 +++ b/divinemc-server/build.gradle.kts
+@@ -32,6 +_,7 @@
+     }
+ 
+     val divinemc = forks.register("divinemc") {
++        rootDirectory = upstreamsDirectory().map { it.dir("divinemc") }
+         forks = purpur
+         upstream.patchRepo("paperServer") {
+             upstreamRepo = purpur.patchedRepo("paperServer")
 @@ -46,7 +_,22 @@
          }
      }
