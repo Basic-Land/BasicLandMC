@@ -28,6 +28,11 @@ paperweight {
             patchesDir = file("basiclandmc-api/paper-patches")
             outputDir = file("paper-api")
         }
+        patchRepo("purpurApi") {
+            upstreamPath = "purpur-api"
+            patchesDir = file("basiclandmc-api/purpur-patches")
+            outputDir = file("purpur-api")
+        }
         patchDir("divinemcApi") {
             upstreamPath = "divinemc-api"
             excludes = listOf("build.gradle.kts", "build.gradle.kts.patch", "paper-patches")
