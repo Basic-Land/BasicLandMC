@@ -10,7 +10,7 @@ val paperMavenPublicUrl = "https://repo.papermc.io/repository/maven-public/"
 
 paperweight {
     upstreams.register("divinemc") {
-        repo = github("BX-Team", "DivineMC")
+        repo = github("dan28000", "DivineMC")
         ref = providers.gradleProperty("divineRef")
 
         patchFile {
