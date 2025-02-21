@@ -16,7 +16,7 @@
 +    val basiclandmc = forks.register("basiclandmc") {
 +        forks = divinemc
 +        upstream.patchRepo("paperServer") {
-+            upstreamRepo = divinemc.patchedRepo("paperServer")
++            upstreamRepo = divinemc.patchedRepo("purpurServer")
 +            patchesDir = rootDirectory.dir("basiclandmc-server/paper-patches")
 +            outputDir = rootDirectory.dir("paper-server")
 +        }

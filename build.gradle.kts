@@ -15,11 +15,6 @@ paperweight {
 
         patchFile {
             path = "divinemc-server/build.gradle.kts"
-            outputFile = file("divinemc-server/build.gradle.kts")
-            patchFile = file("basiclandmc-server/divine-build.gradle.kts.patch")
-        }
-        patchFile {
-            path = "divinemc-server/build.gradle.kts"
             outputFile = file("basiclandmc-server/build.gradle.kts")
             patchFile = file("basiclandmc-server/build.gradle.kts.patch")
         }
@@ -38,22 +33,6 @@ paperweight {
             excludes = listOf("build.gradle.kts", "build.gradle.kts.patch", "paper-patches")
             patchesDir = file("basiclandmc-api/divinemc-patches")
             outputDir = file("divinemc-api")
-        }
-        patchDir("divinemcServer") {
-            upstreamPath = "divinemc-server"
-            excludes = listOf("build.gradle.kts", "build.gradle.kts.patch")
-            patchesDir = file("basiclandmc-server/divinemc-patches")
-            outputDir = file("divinemc-server")
-        }
-        patchDir("purpurApi") {
-            upstreamPath = "purpur-api"
-            patchesDir = file("basiclandmc-api/purpur-patches")
-            outputDir = file("purpur-api")
-        }
-        patchDir("purpurServer") {
-            upstreamPath = "purpur-server"
-            patchesDir = file("basiclandmc-server/purpur-patches")
-            outputDir = file("purpur-server")
         }
     }
 }
