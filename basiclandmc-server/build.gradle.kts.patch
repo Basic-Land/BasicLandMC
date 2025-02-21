@@ -8,7 +8,7 @@
          upstream.patchRepo("paperServer") {
              upstreamRepo = purpur.patchedRepo("paperServer")
              patchesDir = rootDirectory.dir("divinemc-server/paper-patches")
-@@ -46,7 +_,27 @@
+@@ -46,7 +_,32 @@
          }
      }
  
@@ -24,6 +24,11 @@
 +            upstreamRepo = divinemc.patchedRepo("purpurServer")
 +            patchesDir = rootDirectory.dir("basiclandmc-server/purpur-patches")
 +            outputDir = rootDirectory.dir("purpur-server")
++        }
++        upstream.patchRepo("purpurApi") {
++            upstreamRepo = divinemc.patchedRepo("purpurApi")
++            patchesDir = rootDirectory.dir("basiclandmc-api/purpur-patches")
++            outputDir = rootDirectory.dir("purpur-api")
 +        }
 +        upstream.patchDir("divinemcServer") {
 +            upstreamPath = "divinemc-server"
