@@ -1,0 +1,23 @@
+--- a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
++++ b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
+@@ -117,6 +_,20 @@
+         java.util.List<Path> files = ((java.util.List<File>) optionSet.valuesOf("add-plugin")).stream().map(File::toPath).toList();
+         io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.PluginFlagProviderSource.INSTANCE, files);
+ 
++        // BasicLandMC start
++        @SuppressWarnings("unchecked")
++        java.util.List<Path> pluginList = ((java.util.List<File>) optionSet.valuesOf("add-plugin-dir")).stream()
++            .filter(java.util.Objects::nonNull)
++            .map(File::listFiles)
++            .filter(java.util.Objects::nonNull)
++            .flatMap(java.util.Arrays::stream)
++            .filter(File::isFile)
++            .map(File::toPath)
++            .toList();
++
++        io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.PluginFlagProviderSource.INSTANCE, pluginList);
++        //BL end
++
+         final Set<String> paperPluginNames = new TreeSet<>();
+         final Set<String> legacyPluginNames = new TreeSet<>();
+         LaunchEntryPointHandler.INSTANCE.getStorage().forEach((entrypoint, providerStorage) -> {

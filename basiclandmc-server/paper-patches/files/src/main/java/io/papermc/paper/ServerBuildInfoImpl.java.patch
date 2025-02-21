@@ -1,0 +1,22 @@
+--- a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
++++ b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
+@@ -33,6 +_,7 @@
+     private static final String BRAND_PAPER_NAME = "Paper";
+     private static final String BRAND_PURPUR_NAME = "Purpur"; // Purpur - Rebrand
+     private static final String BRAND_DIVINEMC_NAME = "DivineMC"; // DivineMC - Branding
++    private static final String BRAND_BASICLANDMC_NAME = "BasicLandMC"; // BasiclandMC - Branding
+ 
+     private static final String BUILD_DEV = "DEV";
+ 
+@@ -44,9 +_,9 @@
+         this(
+             getManifestAttribute(manifest, ATTRIBUTE_BRAND_ID)
+                 .map(Key::key)
+-                .orElse(BRAND_DIVINEMC_ID), // DivineMC - Branding
++                .orElse(BRAND_BASICLANDMC_ID), // BasiclandMC - Branding
+             getManifestAttribute(manifest, ATTRIBUTE_BRAND_NAME)
+-                .orElse(BRAND_DIVINEMC_NAME), // DivineMC - Branding
++                .orElse(BRAND_BASICLANDMC_NAME), // BasiclandMC - Branding
+             SharedConstants.getCurrentVersion().getId(),
+             SharedConstants.getCurrentVersion().getName(),
+             getManifestAttribute(manifest, ATTRIBUTE_BUILD_NUMBER)
