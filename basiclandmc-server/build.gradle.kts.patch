@@ -1,28 +1,13 @@
 --- a/divinemc-server/build.gradle.kts
 +++ b/divinemc-server/build.gradle.kts
-@@ -22,7 +_,10 @@
-     // gitFilePatches = true
- 
-     val purpur = forks.register("purpur") {
--        rootDirectory = upstreamsDirectory().map { it.dir("purpur") }
-+        rootDirectory = upstreamsDirectory().map {
-+            println("purpur: " + it.path)
-+            it.dir("purpur")
-+        }
-         upstream.patchDir("paperServer") {
-             upstreamPath = "paper-server"
-             excludes = setOf("src/minecraft", "patches", "build.gradle.kts")
-@@ -32,6 +_,10 @@
-     }
+@@ -33,6 +_,7 @@
  
      val divinemc = forks.register("divinemc") {
-+        rootDirectory = upstreamsDirectory().map {
-+            println("divinemc: " + it.path)
-+            it.dir("divinemc")
-+        }
          forks = purpur
++        rootDirectory = upstreamsDirectory().map { it.dir("divinemc") }
          upstream.patchRepo("paperServer") {
              upstreamRepo = purpur.patchedRepo("paperServer")
+             patchesDir = rootDirectory.dir("divinemc-server/paper-patches")
 @@ -46,7 +_,22 @@
          }
      }
