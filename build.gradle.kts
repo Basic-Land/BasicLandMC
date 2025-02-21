@@ -15,6 +15,11 @@ paperweight {
 
         patchFile {
             path = "divinemc-server/build.gradle.kts"
+            outputFile = file("divinemc-server/build.gradle.kts")
+            patchFile = file("basiclandmc-server/divine-build.gradle.kts.patch")
+        }
+        patchFile {
+            path = "divinemc-server/build.gradle.kts"
             outputFile = file("basiclandmc-server/build.gradle.kts")
             patchFile = file("basiclandmc-server/build.gradle.kts.patch")
         }
