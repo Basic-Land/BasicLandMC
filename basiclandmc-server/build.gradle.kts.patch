@@ -8,15 +8,24 @@
          upstream.patchDir("paperServer") {
              upstreamPath = "paper-server"
              excludes = setOf("src/minecraft", "patches", "build.gradle.kts")
-@@ -46,7 +_,27 @@
+@@ -32,6 +_,7 @@
+     }
+ 
+     val divinemc = forks.register("divinemc") {
++        rootDirectory = upstreamsDirectory().map { it.dir("purpur") }
+         forks = purpur
+         upstream.patchRepo("paperServer") {
+             upstreamRepo = purpur.patchedRepo("paperServer")
+@@ -46,7 +_,28 @@
          }
      }
  
 -    activeFork = divinemc
 +    val basiclandmc = forks.register("basiclandmc") {
++        rootDirectory = upstreamsDirectory().map { it.dir("divinemc") }
 +        forks = divinemc
 +        upstream.patchRepo("paperServer") {
-+            upstreamRepo = purpur.patchedRepo("paperServer")
++            upstreamRepo = divinemc.patchedRepo("paperServer")
 +            patchesDir = rootDirectory.dir("basiclandmc-server/paper-patches")
 +            outputDir = rootDirectory.dir("paper-server")
 +        }
