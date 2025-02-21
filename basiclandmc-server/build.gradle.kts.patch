@@ -16,7 +16,7 @@
          forks = purpur
          upstream.patchRepo("paperServer") {
              upstreamRepo = purpur.patchedRepo("paperServer")
-@@ -46,7 +_,28 @@
+@@ -46,7 +_,23 @@
          }
      }
  
@@ -28,11 +28,6 @@
 +            upstreamRepo = divinemc.patchedRepo("paperServer")
 +            patchesDir = rootDirectory.dir("basiclandmc-server/paper-patches")
 +            outputDir = rootDirectory.dir("paper-server")
-+        }
-+        upstream.patchRepo("purpurServer") {
-+            upstreamRepo = divinemc.patchedRepo("purpurServer")
-+            patchesDir = rootDirectory.dir("basiclandmc-server/purpur-patches")
-+            outputDir = rootDirectory.dir("purpur-server")
 +        }
 +        upstream.patchDir("divinemcServer") {
 +            upstreamPath = "divinemc-server"
