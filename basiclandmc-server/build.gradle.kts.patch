@@ -6,7 +6,7 @@
      val purpur = forks.register("purpur") {
 -        rootDirectory = upstreamsDirectory().map { it.dir("purpur") }
 +        rootDirectory = upstreamsDirectory().map {
-+            print("purpur: " + it.path)
++            println("purpur: " + it.path)
 +            it.dir("purpur")
 +        }
          upstream.patchDir("paperServer") {
@@ -17,7 +17,7 @@
  
      val divinemc = forks.register("divinemc") {
 +        rootDirectory = upstreamsDirectory().map {
-+            print("divinemc: " + it.path)
++            println("divinemc: " + it.path)
 +            it.dir("divinemc")
 +        }
          forks = purpur
