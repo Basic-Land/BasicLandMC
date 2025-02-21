@@ -8,13 +8,14 @@
          upstream.patchRepo("paperServer") {
              upstreamRepo = purpur.patchedRepo("paperServer")
              patchesDir = rootDirectory.dir("divinemc-server/paper-patches")
-@@ -46,7 +_,27 @@
+@@ -46,7 +_,28 @@
          }
      }
  
 -    activeFork = divinemc
 +    val basiclandmc = forks.register("basiclandmc") {
 +        forks = divinemc
++        rootDirectory = upstreamsDirectory().map { it.dir("basiclandmc") }
 +        upstream.patchRepo("paperServer") {
 +            upstreamRepo = divinemc.patchedRepo("paperServer")
 +            patchesDir = rootDirectory.dir("basiclandmc-server/paper-patches")
