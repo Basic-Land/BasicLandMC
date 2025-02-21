@@ -1,18 +1,10 @@
 --- a/divinemc-server/build.gradle.kts
 +++ b/divinemc-server/build.gradle.kts
-@@ -22,7 +_,6 @@
-     // gitFilePatches = true
- 
-     val purpur = forks.register("purpur") {
--        rootDirectory = upstreamsDirectory().map { it.dir("purpur") }
-         upstream.patchDir("paperServer") {
-             upstreamPath = "paper-server"
-             excludes = setOf("src/minecraft", "patches", "build.gradle.kts")
 @@ -32,6 +_,7 @@
      }
  
      val divinemc = forks.register("divinemc") {
-+        rootDirectory = upstreamsDirectory().map { it.dir("purpur") }
++        rootDirectory = upstreamsDirectory().map { it.dir("divinemc") }
          forks = purpur
          upstream.patchRepo("paperServer") {
              upstreamRepo = purpur.patchedRepo("paperServer")
@@ -22,7 +14,7 @@
  
 -    activeFork = divinemc
 +    val basiclandmc = forks.register("basiclandmc") {
-+        rootDirectory = upstreamsDirectory().map { it.dir("divinemc") }
++        rootDirectory = upstreamsDirectory().map { it.dir("basiclandmc") }
 +        forks = divinemc
 +        upstream.patchRepo("paperServer") {
 +            upstreamRepo = divinemc.patchedRepo("paperServer")
