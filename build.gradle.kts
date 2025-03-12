@@ -42,6 +42,27 @@ paperweight {
     }
 }
 
+allprojects {
+    apply(plugin = "java")
+    apply(plugin = "maven-publish")
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(22)
+        }
+    }
+
+    tasks.compileJava {
+        options.compilerArgs.add("-Xlint:-deprecation")
+        options.isWarnings = false
+    }
+
+    tasks.withType(JavaCompile::class.java).configureEach {
+        options.isFork = true
+        options.forkOptions.memoryMaximumSize = "4G"
+    }
+}
+
 subprojects {
     apply(plugin = "java-library")
     apply(plugin = "maven-publish")
@@ -82,12 +103,10 @@ subprojects {
 
     extensions.configure<PublishingExtension> {
         repositories {
-            /*
             maven("https://repo.papermc.io/repository/maven-snapshots/") {
                 name = "paperSnapshots"
                 credentials(PasswordCredentials::class)
             }
-             */
         }
     }
 }
