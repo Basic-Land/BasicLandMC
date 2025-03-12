@@ -7,6 +7,7 @@ plugins {
 }
 
 val paperMavenPublicUrl = "https://repo.papermc.io/repository/maven-public/"
+val jitpackMavenUrl = "https://jitpack.io"
 
 paperweight {
     upstreams.register("divinemc") {
@@ -75,6 +76,7 @@ subprojects {
 
     repositories {
         mavenCentral()
+        maven(jitpackMavenUrl)
         maven(paperMavenPublicUrl)
     }
 
@@ -103,10 +105,10 @@ subprojects {
 
     extensions.configure<PublishingExtension> {
         repositories {
-            maven("https://repo.papermc.io/repository/maven-snapshots/") {
-                name = "paperSnapshots"
-                credentials(PasswordCredentials::class)
-            }
+//            maven("https://repo.papermc.io/repository/maven-snapshots/") {
+//                name = "paperSnapshots"
+//                credentials(PasswordCredentials::class)
+//            }
         }
     }
 }
