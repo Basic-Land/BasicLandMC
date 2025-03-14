@@ -95,3 +95,12 @@
              "Build-Number" to (build ?: ""),
              "Build-Time" to buildTime.toString(),
              "Git-Branch" to gitBranch,
+@@ -329,7 +_,7 @@
+         .dir(providers.gradleProperty("paper.runWorkDir").getOrElse("run"))
+         .asFile
+     javaLauncher.set(project.javaToolchains.launcherFor {
+-        languageVersion.set(JavaLanguageVersion.of(21))
++        languageVersion.set(JavaLanguageVersion.of(22))
+         vendor.set(JvmVendorSpec.JETBRAINS)
+     })
+     jvmArgs("-XX:+AllowEnhancedClassRedefinition")
