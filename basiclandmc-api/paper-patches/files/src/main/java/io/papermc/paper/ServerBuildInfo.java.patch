@@ -1,0 +1,16 @@
+--- a/src/main/java/io/papermc/paper/ServerBuildInfo.java
++++ b/src/main/java/io/papermc/paper/ServerBuildInfo.java
+@@ -33,6 +_,13 @@
+     Key BRAND_DIVINEMC_ID = Key.key("bxteam", "divinemc");
+     // DivineMC end
+ 
++    // BasicLandMC start
++    /**
++     * The brand id for BasicLandMC.
++     */
++    Key BRAND_BASICLANDMC_ID = Key.key("basicland", "basiclandmc");
++    // BasicLandMC end
++
+     /**
+      * Gets the {@code ServerBuildInfo}.
+      *

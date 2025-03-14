@@ -66,7 +66,7 @@
 @@ -207,6 +_,11 @@
      implementation("org.agrona:agrona:2.0.1")
      // DivineMC end
- 
+
 +    // BL start - reimplement linear format
 +    implementation("com.github.luben:zstd-jni:1.5.6-9")
 +    implementation("org.lz4:lz4-java:1.8.0")
@@ -80,7 +80,7 @@
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",
 -            "Implementation-Title" to "DivineMC", // DivineMC
-+            "Implementation-Title" to "BasiclandMC", // BasiclandMC
++            "Implementation-Title" to "BasiclandMC", // BasicLandMC
              "Implementation-Version" to implementationVersion,
              "Implementation-Vendor" to date,
 -            "Specification-Title" to "DivineMC", // DivineMC
@@ -89,8 +89,8 @@
 -            "Specification-Vendor" to "BX Team", // DivineMC
 -            "Brand-Id" to "bxteam:divinemc", // DivineMC
 -            "Brand-Name" to "DivineMC", // DivineMC
-+            "Specification-Vendor" to "BL dev", // BasiclandMC
-+            "Brand-Id" to "basicland:basiclandmc", // BasiclandMC
++            "Specification-Vendor" to "BL Team", // BasiclandMC
++            "Brand-Id" to "basiclandmc:basiclandmc", // BasiclandMC
 +            "Brand-Name" to "BasiclandMC", // BasiclandMC
              "Build-Number" to (build ?: ""),
              "Build-Time" to buildTime.toString(),
