@@ -63,6 +63,18 @@
      implementation("ca.spottedleaf:concurrentutil:0.0.3")
      implementation("org.jline:jline-terminal-ffm:3.27.1") // use ffm on java 22+
      implementation("org.jline:jline-terminal-jni:3.27.1") // fall back to jni on java 21
+@@ -207,6 +_,11 @@
+     implementation("org.agrona:agrona:2.0.1")
+     // DivineMC end
+ 
++    // BL start - reimplement linear format
++    implementation("com.github.luben:zstd-jni:1.5.6-9")
++    implementation("org.lz4:lz4-java:1.8.0")
++    // BL end
++
+     runtimeOnly("org.apache.maven:maven-resolver-provider:3.9.6")
+     runtimeOnly("org.apache.maven.resolver:maven-resolver-connector-basic:1.9.18")
+     runtimeOnly("org.apache.maven.resolver:maven-resolver-transport-http:1.9.18")
 @@ -256,14 +_,14 @@
          val experimental = rootProject.providers.gradleProperty("experimental").get()
          attributes(
