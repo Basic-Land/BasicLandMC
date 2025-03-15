@@ -106,6 +106,6 @@
      })
 -    jvmArgs("-XX:+AllowEnhancedClassRedefinition")
 +    //jvmArgs("-XX:+AllowEnhancedClassRedefinition")
-
+ 
      if (rootProject.childProjects["test-plugin"] != null) {
          val testPluginJar = rootProject.project(":test-plugin").tasks.jar.flatMap { it.archiveFile }
