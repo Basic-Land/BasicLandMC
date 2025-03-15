@@ -5,10 +5,10 @@ Subject: [PATCH] Reimplement-Linear-Format
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/DivineConfig.java b/src/main/java/org/bxteam/divinemc/DivineConfig.java
-index 9892076ccb941d64b9759afdbe3bb022ba1fdd0f..513d3959867e63cd3317f75262c7e7186302621d 100644
+index b9b664f126d283daa5640595229ffaf1d87e8b7d..fe48b7d24387c05a2ab11003f2fa48fa6170cfde 100644
 --- a/src/main/java/org/bxteam/divinemc/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/DivineConfig.java
-@@ -304,6 +304,13 @@ public class DivineConfig {
+@@ -300,6 +300,13 @@ public class DivineConfig {
              "Whether to force the use of vanilla commands over plugin commands.");
      }
  
@@ -20,7 +20,7 @@ index 9892076ccb941d64b9759afdbe3bb022ba1fdd0f..513d3959867e63cd3317f75262c7e718
 +    }
 +
      public static boolean disableDisconnectSpam = false;
-     public static boolean connectionFlushQueueRewrite = true;
+     public static boolean connectionFlushQueueRewrite = false;
      private static void networkSettings() {
 diff --git a/src/main/java/org/bxteam/divinemc/DivineWorldConfig.java b/src/main/java/org/bxteam/divinemc/DivineWorldConfig.java
 index ecdc9122142f95562518ee89743338614de5ad2a..e24dadb433376c5883a92651db3fbc1717d45ab7 100644
@@ -61,7 +61,7 @@ index ecdc9122142f95562518ee89743338614de5ad2a..e24dadb433376c5883a92651db3fbc17
      private void unsupportedFeatures() {
 diff --git a/src/main/java/org/bxteam/divinemc/region/AbstractRegionFile.java b/src/main/java/org/bxteam/divinemc/region/AbstractRegionFile.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..31f0d3d812c703bc711c34b7f06c4492be298888
+index 0000000000000000000000000000000000000000..e1e48b1b282f5ac6feee05844a613ba6a22b2452
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/region/AbstractRegionFile.java
 @@ -0,0 +1,28 @@
@@ -95,7 +95,7 @@ index 0000000000000000000000000000000000000000..31f0d3d812c703bc711c34b7f06c4492
 +}
 diff --git a/src/main/java/org/bxteam/divinemc/region/AbstractRegionFileFactory.java b/src/main/java/org/bxteam/divinemc/region/AbstractRegionFileFactory.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..cc40123fb6b02d82c89104e09ce530a2005b90d3
+index 0000000000000000000000000000000000000000..bfd12833dc58fe952d373571e92cf8f999dd032e
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/region/AbstractRegionFileFactory.java
 @@ -0,0 +1,51 @@
@@ -152,7 +152,7 @@ index 0000000000000000000000000000000000000000..cc40123fb6b02d82c89104e09ce530a2
 +}
 diff --git a/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java b/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..88602df34e04206a6d322dfac15665fee16e7b71
+index 0000000000000000000000000000000000000000..02a3d3327bb939b58d18759bcb17a7f197e0256f
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java
 @@ -0,0 +1,309 @@
@@ -467,7 +467,7 @@ index 0000000000000000000000000000000000000000..88602df34e04206a6d322dfac15665fe
 +}
 diff --git a/src/main/java/org/bxteam/divinemc/region/RegionFileFormat.java b/src/main/java/org/bxteam/divinemc/region/RegionFileFormat.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..a63963a5fcff98912d6ab86ba3346cad11388ade
+index 0000000000000000000000000000000000000000..c7f10dc81eed8870aa8df50c6bb14584850b4a3b
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/region/RegionFileFormat.java
 @@ -0,0 +1,55 @@

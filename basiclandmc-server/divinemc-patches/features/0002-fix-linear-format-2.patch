@@ -5,10 +5,10 @@ Subject: [PATCH] fix-linear-format-2
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/DivineConfig.java b/src/main/java/org/bxteam/divinemc/DivineConfig.java
-index 513d3959867e63cd3317f75262c7e7186302621d..ad4367657fb2feaad67446efbee2dbafe2150ae2 100644
+index fe48b7d24387c05a2ab11003f2fa48fa6170cfde..bf6f25a2c7e26db11bfb32f356bf856cd7dafa73 100644
 --- a/src/main/java/org/bxteam/divinemc/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/DivineConfig.java
-@@ -306,9 +306,16 @@ public class DivineConfig {
+@@ -302,9 +302,16 @@ public class DivineConfig {
  
      public static int linearFlushFrequency = 5;
      public static boolean throwOnUnknownExtension = false;
