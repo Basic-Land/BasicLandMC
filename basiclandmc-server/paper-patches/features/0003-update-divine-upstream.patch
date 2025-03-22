@@ -1,0 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <pirkldan28@gmail.com>
+Date: Sat, 15 Mar 2025 20:15:10 +0100
+Subject: [PATCH] update divine upstream
+
+
+diff --git a/src/test/java/org/bukkit/craftbukkit/inventory/ItemStackTest.java b/src/test/java/org/bukkit/craftbukkit/inventory/ItemStackTest.java
+index 1d4d573a782aed2a2668d7b98ed8973e8d7aa422..44e87a0ef295a561fe299a222e1f5cb643fd34b7 100644
+--- a/src/test/java/org/bukkit/craftbukkit/inventory/ItemStackTest.java
++++ b/src/test/java/org/bukkit/craftbukkit/inventory/ItemStackTest.java
+@@ -27,7 +27,7 @@ import org.bukkit.util.io.BukkitObjectOutputStream;
+ import org.junit.jupiter.params.ParameterizedTest;
+ import org.junit.jupiter.params.provider.Arguments;
+ import org.junit.jupiter.params.provider.MethodSource;
+-import org.yaml.snakeyaml.external.biz.base64Coder.Base64Coder;
++import org.simpleyaml.configuration.implementation.snakeyaml.lib.external.biz.base64Coder.Base64Coder;
+ 
+ @AllFeatures
+ public class ItemStackTest {
