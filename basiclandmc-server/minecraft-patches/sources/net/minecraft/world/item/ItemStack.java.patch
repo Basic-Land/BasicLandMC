@@ -1,0 +1,15 @@
+--- a/net/minecraft/world/item/ItemStack.java
++++ b/net/minecraft/world/item/ItemStack.java
+@@ -318,6 +_,12 @@
+         return tag.isEmpty() ? EMPTY : parse(lookupProvider, tag).orElse(EMPTY);
+     }
+ 
++    // BL start - special method for logging broken itemstacks
++    public static DataResult<ItemStack> parseGet(HolderLookup.Provider registries, Tag nbt) {
++        return ItemStack.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), nbt);
++    }
++    // BL end
++
+     public boolean isEmpty() {
+         return this == EMPTY || this.item == Items.AIR || this.count <= 0;
+     }

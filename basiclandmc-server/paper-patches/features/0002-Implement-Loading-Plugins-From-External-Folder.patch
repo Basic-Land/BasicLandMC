@@ -5,10 +5,10 @@ Subject: [PATCH] Implement-Loading-Plugins-From-External-Folder
 
 
 diff --git a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
-index 70413fddd23ca1165cb5090cce4fddcb1bbca93f..9524fbf45f6a65bba6a0d9af51a1ad6318d2ef85 100644
+index 70413fddd23ca1165cb5090cce4fddcb1bbca93f..ad8d530e8718d46fd6ede5c0597cf2bea1aba40d 100644
 --- a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
 +++ b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
-@@ -112,6 +112,26 @@ public class PluginInitializerManager {
+@@ -112,6 +112,30 @@ public class PluginInitializerManager {
          // Register the default plugin directory
          io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.DirectoryProviderSource.INSTANCE, pluginSystem.pluginDirectoryPath());
  
@@ -27,7 +27,11 @@ index 70413fddd23ca1165cb5090cce4fddcb1bbca93f..9524fbf45f6a65bba6a0d9af51a1ad63
 +
 +        boolean override = (boolean) optionSet.valueOf("override");
 +        if (override) {
-+            io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.DirectoryProviderSource.INSTANCE, new File("override").toPath());
++            File[] overrides = new File("override").listFiles((_, name) -> name.endsWith(".jar"));
++            if (overrides != null) {
++                java.util.List<Path> overrideList = java.util.Arrays.stream(overrides).filter(java.util.Objects::nonNull).map(File::toPath).toList();
++                io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.PluginFlagProviderSource.INSTANCE, overrideList);
++            }
 +        }
 +
 +        //BL end

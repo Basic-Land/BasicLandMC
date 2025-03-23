@@ -63,6 +63,15 @@
      implementation("ca.spottedleaf:concurrentutil:0.0.3")
      implementation("org.jline:jline-terminal-ffm:3.27.1") // use ffm on java 22+
      implementation("org.jline:jline-terminal-jni:3.27.1") // fall back to jni on java 21
+@@ -199,7 +_,7 @@
+     implementation("dev.omega24:upnp4j:1.0") // Purpur
+ 
+     // DivineMC start
+-    implementation("org.yaml:snakeyaml:2.4")
++    implementation("org.yaml:snakeyaml:2.2")
+     implementation ("me.carleslc.Simple-YAML:Simple-Yaml:1.8.4") {
+         exclude(group="org.yaml", module="snakeyaml")
+     }
 @@ -258,14 +_,14 @@
          val experimental = rootProject.providers.gradleProperty("experimental").get()
          attributes(
