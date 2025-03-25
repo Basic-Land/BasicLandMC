@@ -5,7 +5,7 @@ Subject: [PATCH] Implement-Loading-Plugins-From-External-Folder
 
 
 diff --git a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
-index 70413fddd23ca1165cb5090cce4fddcb1bbca93f..ad8d530e8718d46fd6ede5c0597cf2bea1aba40d 100644
+index 70413fddd23ca1165cb5090cce4fddcb1bbca93f..029dfaa7edd422042beb37d0892d570c725d1786 100644
 --- a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
 +++ b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
 @@ -112,6 +112,30 @@ public class PluginInitializerManager {
@@ -27,7 +27,7 @@ index 70413fddd23ca1165cb5090cce4fddcb1bbca93f..ad8d530e8718d46fd6ede5c0597cf2be
 +
 +        boolean override = (boolean) optionSet.valueOf("override");
 +        if (override) {
-+            File[] overrides = new File("override").listFiles((_, name) -> name.endsWith(".jar"));
++            File[] overrides = new File("override").listFiles((file, name) -> name.endsWith(".jar"));
 +            if (overrides != null) {
 +                java.util.List<Path> overrideList = java.util.Arrays.stream(overrides).filter(java.util.Objects::nonNull).map(File::toPath).toList();
 +                io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.PluginFlagProviderSource.INSTANCE, overrideList);

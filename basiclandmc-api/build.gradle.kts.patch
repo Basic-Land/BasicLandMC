@@ -1,6 +1,6 @@
 --- a/divinemc-api/build.gradle.kts
 +++ b/divinemc-api/build.gradle.kts
-@@ -105,20 +_,24 @@
+@@ -108,20 +_,24 @@
              srcDir(generatedApiPath)
              srcDir(file("../paper-api/src/main/java"))
              srcDir(file("../purpur-api/src/main/java"))
