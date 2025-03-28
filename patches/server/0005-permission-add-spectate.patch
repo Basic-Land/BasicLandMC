@@ -1,0 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: root <pirkl.dan28@gmail.com>
+Date: Fri, 28 Mar 2025 21:40:37 +0100
+Subject: [PATCH] permission-add-spectate
+
+
+diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+index 26811a1e1eea3726a7b3e0f8dd65c7cba584e23c..ec0a37d5c2e4071d591cc8231c053ae15f903eef 100644
+--- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -2120,7 +2120,7 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
+     @Override
+     public void handleTeleportToEntityPacket(ServerboundTeleportToEntityPacket packet) {
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.serverLevel());
+-        if (this.player.isSpectator()) {
++        if (this.player.isSpectator() && this.player.getBukkitEntity().hasPermission("spectatetp")) {
+             Iterator iterator = this.server.getAllLevels().iterator();
+ 
+             while (iterator.hasNext()) {
