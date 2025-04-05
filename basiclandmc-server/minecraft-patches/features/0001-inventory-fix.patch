@@ -1,0 +1,109 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <pirkldan28@gmail.com>
+Date: Sat, 5 Apr 2025 16:47:47 +0200
+Subject: [PATCH] inventory-fix
+
+
+diff --git a/cz/basicland/ItemFix.java b/cz/basicland/ItemFix.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..423de04ff36bfb588c3b7a2c1d03163a41f6deb8
+--- /dev/null
++++ b/cz/basicland/ItemFix.java
+@@ -0,0 +1,54 @@
++package cz.basicland;
++
++import com.mojang.logging.LogUtils;
++import com.mojang.serialization.DataResult;
++import net.minecraft.core.HolderLookup;
++import net.minecraft.nbt.CompoundTag;
++import net.minecraft.world.entity.player.Player;
++import net.minecraft.world.item.ItemStack;
++import org.bukkit.Material;
++import org.slf4j.Logger;
++
++import java.util.Optional;
++
++public class ItemFix {
++    private static final Logger LOGGER = LogUtils.getLogger();
++
++    public static ItemStack fix(CompoundTag compound, HolderLookup.Provider access, Player player, int slot, boolean ender) {
++        DataResult<ItemStack> dataResult = ItemStack.parseGet(access, compound);
++        Optional<ItemStack> result = dataResult.result();
++        ItemStack itemStack;
++        if (result.isEmpty()) {
++            LOGGER.error("Player '{}' has broken item in{}slot '{}'", player.getStringUUID(), ender ? " enderchest " : " ", slot);
++            itemStack = dataResult.resultOrPartial().orElse(ItemStack.EMPTY);
++            LOGGER.warn(itemStack.toString());
++            itemStack.getEnchantments().entrySet().forEach(entry -> LOGGER.warn("enchant '{}' lvl '{}'", entry.getKey().value(), entry.getIntValue()));
++
++            Material type = itemStack.getBukkitStack().getType();
++            if (type == Material.TRIPWIRE_HOOK) {
++                CompoundTag levels = compound
++                    .getCompound("components")
++                    .getCompound("minecraft:enchantments")
++                    .getCompound("levels");
++
++                if (levels.isEmpty()) {
++                    return itemStack;
++                }
++
++                byte showInTooltip = levels.getByte("show_in_tooltip");
++                int lvl = levels.getInt("minecraft:unbreaking");
++
++                if (showInTooltip == 0 && lvl == 0) {
++                    levels.putInt("minecraft:unbreaking", 1);
++                    compound.merge(levels);
++                }
++
++                return ItemStack.parse(access, compound).orElse(itemStack);
++            }
++            return itemStack;
++        } else {
++            itemStack = result.get();
++        }
++        return itemStack;
++    }
++}
+diff --git a/net/minecraft/world/entity/player/Inventory.java b/net/minecraft/world/entity/player/Inventory.java
+index 839cbb67d3d38960d9114a4db5bab911b66a573c..7f0ba8b60771349b377a82c7cf190a7fae76a4e8 100644
+--- a/net/minecraft/world/entity/player/Inventory.java
++++ b/net/minecraft/world/entity/player/Inventory.java
+@@ -477,7 +477,7 @@ public class Inventory implements Container, Nameable {
+         for (int i = 0; i < listTag.size(); i++) {
+             CompoundTag compound = listTag.getCompound(i);
+             int i1 = compound.getByte("Slot") & 255;
+-            ItemStack itemStack = ItemStack.parse(this.player.registryAccess(), compound).orElse(ItemStack.EMPTY);
++            ItemStack itemStack = cz.basicland.ItemFix.fix(compound, player.registryAccess(), player, i1, false);  // BL fix and log broken items
+             if (i1 >= 0 && i1 < this.items.size()) {
+                 this.items.set(i1, itemStack);
+             } else if (i1 >= 100 && i1 < this.armor.size() + 100) {
+diff --git a/net/minecraft/world/inventory/PlayerEnderChestContainer.java b/net/minecraft/world/inventory/PlayerEnderChestContainer.java
+index d2d75e5c34c97300ce5da8c7ea70958aba31fa4a..8d8c74db669dd34a83b57f1dc75eec072fc7de7b 100644
+--- a/net/minecraft/world/inventory/PlayerEnderChestContainer.java
++++ b/net/minecraft/world/inventory/PlayerEnderChestContainer.java
+@@ -55,7 +55,7 @@ public class PlayerEnderChestContainer extends SimpleContainer {
+             CompoundTag compound = tag.getCompound(i);
+             int i1 = compound.getByte("Slot") & 255;
+             if (i1 >= 0 && i1 < this.getContainerSize()) {
+-                this.setItem(i1, ItemStack.parse(levelRegistry, compound).orElse(ItemStack.EMPTY));
++                this.setItem(i1, cz.basicland.ItemFix.fix(compound, levelRegistry, owner, i1, true)); // BL fix and log broken items
+             }
+         }
+     }
+diff --git a/net/minecraft/world/item/ItemStack.java b/net/minecraft/world/item/ItemStack.java
+index f461b060e03edf4102290a424ab008b88d80bdc2..b7f913ff8c94cf0a0374d7dea148ee649dfb5904 100644
+--- a/net/minecraft/world/item/ItemStack.java
++++ b/net/minecraft/world/item/ItemStack.java
+@@ -318,6 +318,12 @@ public final class ItemStack implements DataComponentHolder {
+         return tag.isEmpty() ? EMPTY : parse(lookupProvider, tag).orElse(EMPTY);
+     }
+ 
++    //BL start
++    public static DataResult<ItemStack> parseGet(HolderLookup.Provider lookupProvider, Tag tag) {
++        return CODEC.parse(lookupProvider.createSerializationContext(NbtOps.INSTANCE), tag);
++    }
++    //BL end
++
+     public boolean isEmpty() {
+         return this == EMPTY || this.item == Items.AIR || this.count <= 0;
+     }
