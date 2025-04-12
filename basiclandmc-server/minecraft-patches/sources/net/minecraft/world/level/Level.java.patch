@@ -1,0 +1,11 @@
+--- a/net/minecraft/world/level/Level.java
++++ b/net/minecraft/world/level/Level.java
+@@ -115,7 +_,7 @@
+     public static final int MIN_ENTITY_SPAWN_Y = -20000000;
+     public final org.bxteam.divinemc.util.BlockEntityTickersList blockEntityTickers = new org.bxteam.divinemc.util.BlockEntityTickersList(); // Paper - public // DivineMC - optimize block entity removals - Fix MC-117075
+     protected final NeighborUpdater neighborUpdater;
+-    private final List<TickingBlockEntity> pendingBlockEntityTickers = Lists.newArrayList();
++    private final List<TickingBlockEntity> pendingBlockEntityTickers = java.util.Collections.synchronizedList(Lists.newArrayList());
+     private boolean tickingBlockEntities;
+     public final Thread thread;
+     private final boolean isDebug;
