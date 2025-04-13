@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <pirkldan28@gmail.com>
+Date: Sun, 13 Apr 2025 11:35:10 +0200
+Subject: [PATCH] make-tpsbar-show-tps-of-entire-server
+
+
+diff --git a/src/main/java/org/purpurmc/purpur/task/TPSBarTask.java b/src/main/java/org/purpurmc/purpur/task/TPSBarTask.java
+index 3d1b183da57e7e267973db27867c7d9a6a64c044..7570a22c986f14c4aef3feec12a40b2e2185d70f 100644
+--- a/src/main/java/org/purpurmc/purpur/task/TPSBarTask.java
++++ b/src/main/java/org/purpurmc/purpur/task/TPSBarTask.java
+@@ -35,13 +35,10 @@ public class TPSBarTask extends BossBarTask {
+             ServerLevel serverLevel = ((CraftWorld)player.getWorld()).getHandle();
+ 
+             double worldMspt = calculateWorldMSPT(serverLevel);
+-            double worldTps = Math.min(20.0, 1000.0 / Math.max(worldMspt, 0.001));
+ 
+-            double originalTps = this.tps;
+             double originalMspt = this.mspt;
+ 
+             try {
+-                this.tps = worldTps;
+                 this.mspt = worldMspt;
+ 
+                 Component msptWithWorld = Component.empty()
+@@ -56,7 +53,6 @@ public class TPSBarTask extends BossBarTask {
+                     Placeholder.component("ping", getPingColor(player.getPing()))
+                 ));
+             } finally {
+-                this.tps = originalTps;
+                 this.mspt = originalMspt;
+             }
+         } else {
