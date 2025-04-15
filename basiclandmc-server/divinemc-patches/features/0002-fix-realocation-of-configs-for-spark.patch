@@ -1,0 +1,45 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <pirkldan28@gmail.com>
+Date: Mon, 14 Apr 2025 11:27:40 +0200
+Subject: [PATCH] fix-realocation-of-configs-for-spark
+
+
+diff --git a/src/main/java/org/bxteam/divinemc/spark/DivineServerConfigProvider.java b/src/main/java/org/bxteam/divinemc/spark/DivineServerConfigProvider.java
+index 12c19854f9b52cda8798ad192d7056344f33dd93..40e642aed66bc0572845132671c31d8e9677b999 100644
+--- a/src/main/java/org/bxteam/divinemc/spark/DivineServerConfigProvider.java
++++ b/src/main/java/org/bxteam/divinemc/spark/DivineServerConfigProvider.java
+@@ -65,7 +65,7 @@ public class DivineServerConfigProvider extends ServerConfigProvider {
+         public JsonElement load(@NotNull String group, ExcludedConfigFilter filter) throws IOException {
+             String prefix = group.replace("/", "");
+ 
+-            Path configDir = Paths.get("config");
++            Path configDir = Paths.get(getPath("paper-dir"));
+             if (!Files.exists(configDir)) {
+                 return null;
+             }
+@@ -99,16 +99,18 @@ public class DivineServerConfigProvider extends ServerConfigProvider {
+         }
+     }
+ 
++    private static String getPath(String optionsName) {
++        return ((java.io.File) net.minecraft.server.MinecraftServer.getServer().options.valueOf(optionsName)).getPath();
++    }
++
+     static {
+         ImmutableMap.Builder<String, ConfigParser> files = ImmutableMap.<String, ConfigParser>builder()
+-            .put("server.properties", PropertiesConfigParser.INSTANCE)
+-            .put("bukkit.yml", YamlConfigParser.INSTANCE)
+-            .put("spigot.yml", YamlConfigParser.INSTANCE)
+-            .put("paper.yml", YamlConfigParser.INSTANCE)
++            .put(getPath("config"), PropertiesConfigParser.INSTANCE)
++            .put(getPath("bukkit-settings"), YamlConfigParser.INSTANCE)
++            .put(getPath("spigot-settings"), YamlConfigParser.INSTANCE)
+             .put("paper/", SplitYamlConfigParser.INSTANCE)
+-            .put("pufferfish.yml", YamlConfigParser.INSTANCE)
+-            .put("purpur.yml", YamlConfigParser.INSTANCE)
+-            .put("divinemc.yml", YamlConfigParser.INSTANCE);
++            .put(getPath("purpur-settings"), YamlConfigParser.INSTANCE)
++            .put(getPath("divinemc-settings"), YamlConfigParser.INSTANCE);
+ 
+         for (String config : getSystemPropertyList("spark.serverconfigs.extra")) {
+             files.put(config, YamlConfigParser.INSTANCE);
