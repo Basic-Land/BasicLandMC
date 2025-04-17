@@ -3,7 +3,7 @@ import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 plugins {
     java
-    id("io.papermc.paperweight.patcher") version "2.0.0-SNAPSHOT"
+    id("io.papermc.paperweight.patcher") version "2.0.0-beta.14"
 }
 
 val paperMavenPublicUrl = "https://repo.papermc.io/repository/maven-public/"
@@ -105,10 +105,11 @@ subprojects {
 
     extensions.configure<PublishingExtension> {
         repositories {
-//            maven("https://repo.papermc.io/repository/maven-snapshots/") {
-//                name = "paperSnapshots"
-//                credentials(PasswordCredentials::class)
-//            }
+            maven("http://nexus.basicland.cz:8081/repository/dev-snapshots/") {
+                name = "BasicLandMCSnapshots"
+                isAllowInsecureProtocol = true
+                credentials(PasswordCredentials::class)
+            }
         }
     }
 }
