@@ -1,0 +1,53 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <pirkldan28@gmail.com>
+Date: Wed, 16 Apr 2025 19:00:46 +0200
+Subject: [PATCH] sync-fix-neighbor-updater
+
+
+diff --git a/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java b/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java
+index 028eae2f9a459b60e92f3344091083aa93b54485..b7b106170d089508cc800693984185210436c417 100644
+--- a/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java
++++ b/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java
+@@ -17,9 +17,9 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
+     private static final Logger LOGGER = LogUtils.getLogger();
+     private final Level level;
+     private final int maxChainedNeighborUpdates;
+-    private final ArrayDeque<CollectingNeighborUpdater.NeighborUpdates> stack = new ArrayDeque<>();
+-    private final List<CollectingNeighborUpdater.NeighborUpdates> addedThisLayer = new ArrayList<>();
+-    private int count = 0;
++    private final java.util.Deque<NeighborUpdates> stack = new java.util.concurrent.ConcurrentLinkedDeque<>();
++    private final List<CollectingNeighborUpdater.NeighborUpdates> addedThisLayer = java.util.Collections.synchronizedList(new ArrayList<>());
++    private final java.util.concurrent.atomic.AtomicInteger count = new java.util.concurrent.atomic.AtomicInteger();
+ 
+     public CollectingNeighborUpdater(Level level, int maxChainedNeighborUpdates) {
+         this.level = level;
+@@ -47,16 +47,16 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
+     }
+ 
+     private void addAndRun(BlockPos pos, CollectingNeighborUpdater.NeighborUpdates updates) {
+-        boolean flag = this.count > 0;
+-        boolean flag1 = this.maxChainedNeighborUpdates >= 0 && this.count >= this.maxChainedNeighborUpdates;
+-        this.count++;
++        boolean flag = this.count.get() > 0;
++        boolean flag1 = this.maxChainedNeighborUpdates >= 0 && this.count.get() >= this.maxChainedNeighborUpdates;
++        this.count.getAndIncrement();
+         if (!flag1) {
+             if (flag) {
+                 this.addedThisLayer.add(updates);
+             } else {
+                 this.stack.push(updates);
+             }
+-        } else if (this.count - 1 == this.maxChainedNeighborUpdates) {
++        } else if (this.count.get() - 1 == this.maxChainedNeighborUpdates) {
+             LOGGER.error("Too many chained neighbor updates. Skipping the rest. First skipped position: " + pos.toShortString());
+         }
+ 
+@@ -85,7 +85,7 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
+         } finally {
+             this.stack.clear();
+             this.addedThisLayer.clear();
+-            this.count = 0;
++            this.count.set(0);
+         }
+     }
+ 
