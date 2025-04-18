@@ -1,0 +1,974 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <pirkldan28@gmail.com>
+Date: Thu, 17 Apr 2025 20:54:06 +0200
+Subject: [PATCH] linear-rewrite
+
+
+diff --git a/src/main/java/org/bxteam/divinemc/DivineConfig.java b/src/main/java/org/bxteam/divinemc/DivineConfig.java
+index d4ad79c9062267bf5a1573a76a38474930a93f34..91ee6902a27c113397938a89deb87010d7c70910 100644
+--- a/src/main/java/org/bxteam/divinemc/DivineConfig.java
++++ b/src/main/java/org/bxteam/divinemc/DivineConfig.java
+@@ -10,7 +10,6 @@ import org.apache.logging.log4j.Logger;
+ import org.bukkit.configuration.ConfigurationSection;
+ import org.bukkit.configuration.MemoryConfiguration;
+ import org.bxteam.divinemc.entity.pathfinding.PathfindTaskRejectPolicy;
+-import org.bxteam.divinemc.region.LinearImplementation;
+ import org.bxteam.divinemc.server.chunk.ChunkSystemAlgorithms;
+ import org.bxteam.divinemc.server.chunk.ChunkTaskPriority;
+ import org.jetbrains.annotations.Nullable;
+@@ -528,7 +527,6 @@ public class DivineConfig {
+     }
+ 
+     public static RegionFileFormat regionFormatTypeName = RegionFileFormat.ANVIL;
+-    public static LinearImplementation linearImplementation = LinearImplementation.V2;
+     public static int linearFlushMaxThreads = 4;
+     public static int linearFlushDelay = 100;
+     public static boolean linearUseVirtualThread = false;
+@@ -539,12 +537,6 @@ public class DivineConfig {
+             "Valid values:",
+             " - LINEAR: Linear region file format",
+             " - ANVIL: Anvil region file format (default)"));
+-        linearImplementation = LinearImplementation.valueOf(getString("settings.linear-region-format.implementation", linearImplementation.name(),
+-            "The implementation of the linear region file format to use.",
+-            "Valid values:",
+-            " - V1: Basic and default linear implementation",
+-            " - V2: Introduces a grid-based compression scheme for better data management and flexibility (default)"));
+-
+         linearFlushMaxThreads = getInt("settings.linear-region-format.flush-max-threads", linearFlushMaxThreads,
+             "The maximum number of threads to use for flushing linear region files.",
+             "If this value is less than or equal to 0, it will be set to the number of available processors + this value.");
+diff --git a/src/main/java/org/bxteam/divinemc/region/LinearImplementation.java b/src/main/java/org/bxteam/divinemc/region/LinearImplementation.java
+deleted file mode 100644
+index e5215938c382a5d54a1166e14f17b533301272c7..0000000000000000000000000000000000000000
+--- a/src/main/java/org/bxteam/divinemc/region/LinearImplementation.java
++++ /dev/null
+@@ -1,6 +0,0 @@
+-package org.bxteam.divinemc.region;
+-
+-public enum LinearImplementation {
+-    V1,
+-    V2
+-}
+diff --git a/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java b/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java
+index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..d1c16a0b6fcccb3a1fea00ab8087b0b1a9b1cc1e 100644
+--- a/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java
++++ b/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java
+@@ -4,23 +4,13 @@ import ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO;
+ import com.github.luben.zstd.ZstdInputStream;
+ import com.github.luben.zstd.ZstdOutputStream;
+ import com.mojang.logging.LogUtils;
+-import net.jpountz.lz4.LZ4Compressor;
+-import net.jpountz.lz4.LZ4Factory;
+-import net.jpountz.lz4.LZ4FastDecompressor;
+-import net.minecraft.nbt.CompoundTag;
+-import net.minecraft.world.level.ChunkPos;
+-import net.openhft.hashing.LongHashFunction;
+-import org.bxteam.divinemc.DivineConfig;
+-import org.bxteam.divinemc.spark.ThreadDumperRegistry;
+-import org.jspecify.annotations.Nullable;
+-import org.slf4j.Logger;
+-
+ import java.io.BufferedOutputStream;
+ import java.io.ByteArrayInputStream;
+ import java.io.ByteArrayOutputStream;
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
+ import java.io.File;
++import java.io.FileInputStream;
+ import java.io.FileOutputStream;
+ import java.io.IOException;
+ import java.io.InputStream;
+@@ -29,631 +19,297 @@ import java.nio.file.Files;
+ import java.nio.file.Path;
+ import java.nio.file.StandardCopyOption;
+ import java.util.ArrayList;
+-import java.util.concurrent.TimeUnit;
+-import java.util.concurrent.locks.LockSupport;
+-
+-public class LinearRegionFile implements IRegionFile {
+-    public static final int MAX_CHUNK_SIZE = 500 * 1024 * 1024;
+-    private static final Object SAVE_LOCK = new Object();
+-    private static final long SUPERBLOCK = 0xc3ff13183cca9d9aL;
+-    private static final Logger LOGGER = LogUtils.getLogger();
+-
+-    private static final byte V1_VERSION = 2;
+-    private static final byte V2_VERSION = 3;
+-
+-    private byte[][] bucketBuffers;
+-    private final byte[][] chunkCompressedBuffers = new byte[1024][];
+-    private final int[] chunkUncompressedSizes = new int[1024];
+-    private final long[] chunkTimestamps = new long[1024];
++import java.util.Arrays;
++import java.util.List;
++import java.util.concurrent.atomic.AtomicBoolean;
++import javax.annotation.Nullable;
++import net.jpountz.lz4.LZ4Compressor;
++import net.jpountz.lz4.LZ4Factory;
++import net.jpountz.lz4.LZ4FastDecompressor;
++import net.minecraft.nbt.CompoundTag;
++import net.minecraft.world.level.ChunkPos;
++import org.slf4j.Logger;
+ 
+-    private final Object markedToSaveLock = new Object();
+-    private boolean markedToSave = false;
++public class LinearRegionFile implements IRegionFile, AutoCloseable {
+ 
++    private static final long SUPERBLOCK = -4323716122432332390L;
++    private static final byte VERSION = 2;
++    private static final int HEADER_SIZE = 32;
++    private static final int FOOTER_SIZE = 8;
++    private static final Logger LOGGER = LogUtils.getLogger();
++    private static final List<Byte> SUPPORTED_VERSIONS = Arrays.asList((byte) 1, (byte) 2);
++    private static final LinearRegionFileFlusher linearRegionFileFlusher = new LinearRegionFileFlusher();
++    private final byte[][] buffer = new byte[1024][];
++    private final int[] bufferUncompressedSize = new int[1024];
++    private final int[] chunkTimestamps = new int[1024];
+     private final LZ4Compressor compressor;
+     private final LZ4FastDecompressor decompressor;
+-
+-    private volatile boolean regionFileOpen = false;
+-    private volatile boolean close = false;
+-
+-    private final Path regionFilePath;
+-    private final int gridSizeDefault = 8;
+-    private int gridSize = gridSizeDefault;
+-    private int bucketSize = 4;
+     private final int compressionLevel;
+-    private final LinearImplementation linearImpl;
+-    private final Thread schedulingThread;
++    private final AtomicBoolean markedToSave = new AtomicBoolean(false);
++    public boolean closed = false;
++    public Path path;
+ 
+-    private static int activeSaveThreads = 0;
+ 
+-    public LinearRegionFile(Path path, LinearImplementation linearImplementation, int compressionLevel) {
+-        this.regionFilePath = path;
+-        this.linearImpl = linearImplementation;
+-        this.compressionLevel = compressionLevel;
++    public LinearRegionFile(Path file, int compression) throws IOException {
++        this.path = file;
++        this.compressionLevel = compression;
+         this.compressor = LZ4Factory.fastestInstance().fastCompressor();
+         this.decompressor = LZ4Factory.fastestInstance().fastDecompressor();
+ 
+-        Runnable flushCheck = () -> {
+-            while (!close) {
+-                synchronized (SAVE_LOCK) {
+-                    if (markedToSave && activeSaveThreads < DivineConfig.linearFlushMaxThreads) {
+-                        activeSaveThreads++;
+-                        Runnable flushOperation = () -> {
+-                            try {
+-                                flush();
+-                            } catch (IOException ex) {
+-                                LOGGER.error("Region file {} flush failed", regionFilePath.toAbsolutePath(), ex);
+-                            } finally {
+-                                synchronized (SAVE_LOCK) {
+-                                    activeSaveThreads--;
+-                                }
+-                            }
+-                        };
+-                        Thread saveThread = DivineConfig.linearUseVirtualThread
+-                            ? Thread.ofVirtual().name("Linear IO - " + this.hashCode()).unstarted(flushOperation)
+-                            : Thread.ofPlatform().name("Linear IO - " + this.hashCode()).unstarted(flushOperation);
+-                        saveThread.setPriority(Thread.NORM_PRIORITY - 3);
+-                        saveThread.start();
+-                        ThreadDumperRegistry.REGISTRY.add(saveThread.getName());
+-                    }
+-                }
+-                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(DivineConfig.linearFlushDelay));
+-            }
+-        };
+-        this.schedulingThread = DivineConfig.linearUseVirtualThread
+-            ? Thread.ofVirtual().unstarted(flushCheck)
+-            : Thread.ofPlatform().unstarted(flushCheck);
+-        this.schedulingThread.setName("Linear IO Schedule - " + this.hashCode());
+-        ThreadDumperRegistry.REGISTRY.add(this.schedulingThread.getName());
+-    }
++        File regionFile = new File(this.path.toString());
+ 
+-    private synchronized void openRegionFile() {
+-        if (regionFileOpen) return;
+-        regionFileOpen = true;
++        Arrays.fill(this.bufferUncompressedSize, 0);
+ 
+-        File file = regionFilePath.toFile();
+-        if (!file.canRead()) {
+-            schedulingThread.start();
+-            return;
+-        }
++        if (!regionFile.canRead()) return;
+ 
+-        try {
+-            byte[] fileContent = Files.readAllBytes(regionFilePath);
+-            ByteBuffer byteBuffer = ByteBuffer.wrap(fileContent);
++        try (FileInputStream fileStream = new FileInputStream(regionFile);
++             DataInputStream rawDataStream = new DataInputStream(fileStream)) {
+ 
+-            long superBlock = byteBuffer.getLong();
+-            if (superBlock != SUPERBLOCK) {
+-                throw new RuntimeException("Invalid superblock: " + superBlock + " file " + regionFilePath);
+-            }
++            long superBlock = rawDataStream.readLong();
++            if (superBlock != SUPERBLOCK)
++                throw new RuntimeException("Invalid superblock: " + superBlock + " in " + file);
+ 
+-            byte version = byteBuffer.get();
+-            if (version == V1_VERSION) {
+-                parseLinearV1(byteBuffer);
+-            } else if (version == V2_VERSION) {
+-                parseLinearV2(byteBuffer);
+-            } else {
+-                throw new RuntimeException("Invalid version: " + version + " file " + regionFilePath);
+-            }
++            byte version = rawDataStream.readByte();
++            if (!SUPPORTED_VERSIONS.contains(version))
++                throw new RuntimeException("Invalid version: " + version + " in " + file);
+ 
+-            schedulingThread.start();
+-        } catch (IOException e) {
+-            throw new RuntimeException("Failed to open region file " + regionFilePath, e);
+-        }
+-    }
++            // Skip newestTimestamp (Long) + Compression level (Byte) + Chunk count (Short): Unused.
++            rawDataStream.skipBytes(11);
+ 
+-    private void parseLinearV1(ByteBuffer buffer) throws IOException {
+-        final int HEADER_SIZE = 32;
+-        final int FOOTER_SIZE = 8;
+-        buffer.position(buffer.position() + 11);
++            int dataCount = rawDataStream.readInt();
++            long fileLength = file.toFile().length();
++            if (fileLength != HEADER_SIZE + dataCount + FOOTER_SIZE)
++                throw new IOException("Invalid file length: " + this.path + " " + fileLength + " " + (HEADER_SIZE + dataCount + FOOTER_SIZE));
+ 
+-        int dataCount = buffer.getInt();
+-        long fileLength = regionFilePath.toFile().length();
+-        if (fileLength != HEADER_SIZE + dataCount + FOOTER_SIZE) {
+-            throw new IOException("Invalid file length: " + regionFilePath + " " + fileLength + " expected " + (HEADER_SIZE + dataCount + FOOTER_SIZE));
+-        }
++            rawDataStream.skipBytes(8); // Skip data hash (Long): Unused.
+ 
+-        buffer.position(buffer.position() + 8);
++            byte[] rawCompressed = new byte[dataCount];
++            rawDataStream.readFully(rawCompressed, 0, dataCount);
+ 
+-        byte[] rawCompressed = new byte[dataCount];
+-        buffer.get(rawCompressed);
++            superBlock = rawDataStream.readLong();
++            if (superBlock != SUPERBLOCK)
++                throw new IOException("Footer superblock invalid " + this.path);
+ 
+-        try (ByteArrayInputStream bais = new ByteArrayInputStream(rawCompressed);
+-             ZstdInputStream zstdIn = new ZstdInputStream(bais)) {
+-            ByteBuffer decompressedBuffer = ByteBuffer.wrap(zstdIn.readAllBytes());
+-            int[] starts = new int[1024];
+-            for (int i = 0; i < 1024; i++) {
+-                starts[i] = decompressedBuffer.getInt();
+-                decompressedBuffer.getInt();
+-            }
++            try (DataInputStream dataStream = new DataInputStream(new ZstdInputStream(new ByteArrayInputStream(rawCompressed)))) {
+ 
+-            for (int i = 0; i < 1024; i++) {
+-                if (starts[i] > 0) {
+-                    int size = starts[i];
+-                    byte[] chunkData = new byte[size];
+-                    decompressedBuffer.get(chunkData);
+-
+-                    int maxCompressedLength = compressor.maxCompressedLength(size);
+-                    byte[] compressed = new byte[maxCompressedLength];
+-                    int compressedLength = compressor.compress(chunkData, 0, size, compressed, 0, maxCompressedLength);
+-                    byte[] finalCompressed = new byte[compressedLength];
+-                    System.arraycopy(compressed, 0, finalCompressed, 0, compressedLength);
+-
+-                    chunkCompressedBuffers[i] = finalCompressed;
+-                    chunkUncompressedSizes[i] = size;
+-                    chunkTimestamps[i] = currentTimestamp();
++                int[] starts = new int[1024];
++                for (int i = 0; i < 1024; i++) {
++                    starts[i] = dataStream.readInt();
++                    dataStream.skipBytes(4); // Skip timestamps (Int): Unused.
+                 }
+-            }
+-        }
+-    }
+-
+-    private void parseLinearV2(ByteBuffer buffer) throws IOException {
+-        buffer.getLong();
+-        gridSize = buffer.get();
+-        if (!(gridSize == 1 || gridSize == 2 || gridSize == 4 || gridSize == 8 || gridSize == 16 || gridSize == 32)) {
+-            throw new RuntimeException("Invalid grid size: " + gridSize + " file " + regionFilePath);
+-        }
+-        bucketSize = 32 / gridSize;
+ 
+-        buffer.getInt();
+-        buffer.getInt();
++                for (int i = 0; i < 1024; i++) {
++                    if (starts[i] > 0) {
++                        int size = starts[i];
++                        byte[] b = new byte[size];
++                        dataStream.readFully(b, 0, size);
+ 
+-        boolean[] chunkExistenceBitmap = deserializeExistenceBitmap(buffer);
+-
+-        while (true) {
+-            byte featureNameLength = buffer.get();
+-            if (featureNameLength == 0) break;
+-            byte[] featureNameBytes = new byte[featureNameLength];
+-            buffer.get(featureNameBytes);
+-            String featureName = new String(featureNameBytes);
+-            int featureValue = buffer.getInt();
+-        }
+-
+-        int bucketCount = gridSize * gridSize;
+-        int[] bucketSizes = new int[bucketCount];
+-        byte[] bucketCompressionLevels = new byte[bucketCount];
+-        long[] bucketHashes = new long[bucketCount];
+-
+-        for (int i = 0; i < bucketCount; i++) {
+-            bucketSizes[i] = buffer.getInt();
+-            bucketCompressionLevels[i] = buffer.get();
+-            bucketHashes[i] = buffer.getLong();
+-        }
++                        int maxCompressedLength = this.compressor.maxCompressedLength(size);
++                        byte[] compressed = new byte[maxCompressedLength];
++                        int compressedLength = this.compressor.compress(b, 0, size, compressed, 0, maxCompressedLength);
++                        b = new byte[compressedLength];
++                        System.arraycopy(compressed, 0, b, 0, compressedLength);
+ 
+-        bucketBuffers = new byte[bucketCount][];
+-        for (int i = 0; i < bucketCount; i++) {
+-            if (bucketSizes[i] > 0) {
+-                bucketBuffers[i] = new byte[bucketSizes[i]];
+-                buffer.get(bucketBuffers[i]);
+-                long rawHash = LongHashFunction.xx().hashBytes(bucketBuffers[i]);
+-                if (rawHash != bucketHashes[i]) {
+-                    throw new IOException("Region file hash incorrect " + regionFilePath);
++                        this.buffer[i] = b;
++                        this.bufferUncompressedSize[i] = size;
++                    }
+                 }
+             }
+         }
+-
+-        long footerSuperBlock = buffer.getLong();
+-        if (footerSuperBlock != SUPERBLOCK) {
+-            throw new IOException("Footer superblock invalid " + regionFilePath);
+-        }
+     }
+ 
+-    private synchronized void markToSave() {
+-        synchronized (markedToSaveLock) {
+-            markedToSave = true;
+-        }
++    private static int getChunkIndex(int x, int z) {
++        return (x & 31) + ((z & 31) << 5);
+     }
+ 
+-    private synchronized boolean isMarkedToSave() {
+-        synchronized (markedToSaveLock) {
+-            if (markedToSave) {
+-                markedToSave = false;
+-                return true;
+-            }
+-            return false;
+-        }
++    private static int getTimestamp() {
++        return (int) (System.currentTimeMillis() / 1000L);
+     }
+ 
+-    @Override
+-    public synchronized boolean doesChunkExist(ChunkPos pos) {
+-        openRegionFile();
+-        return hasChunk(pos);
++    public Path getPath() {
++        return this.path;
+     }
+ 
+-    @Override
+-    public synchronized boolean hasChunk(ChunkPos pos) {
+-        openRegionFile();
+-        openBucketForChunk(pos.x, pos.z);
+-        int index = getChunkIndex(pos.x, pos.z);
+-        return chunkUncompressedSizes[index] > 0;
++    public void flush() throws IOException {
++        if (isMarkedToSave()) flushWrapper(); // sync
+     }
+ 
+-    @Override
+-    public synchronized void flush() throws IOException {
+-        if (!isMarkedToSave()) return;
+-        openRegionFile();
+-        if (linearImpl == LinearImplementation.V1) {
+-            flushLinearV1();
+-        } else if (linearImpl == LinearImplementation.V2) {
+-            flushLinearV2();
+-        }
++    private void markToSave() {
++        linearRegionFileFlusher.scheduleSave(this);
++        markedToSave.set(true);
+     }
+ 
+-    private void flushLinearV1() throws IOException {
+-        long timestamp = currentTimestamp();
+-        short chunkCount = 0;
+-        File tempFile = new File(regionFilePath.toString() + ".tmp");
+-
+-        try (FileOutputStream fos = new FileOutputStream(tempFile);
+-             ByteArrayOutputStream zstdBAOS = new ByteArrayOutputStream();
+-             ZstdOutputStream zstdOut = new ZstdOutputStream(zstdBAOS, compressionLevel);
+-             DataOutputStream zstdDataOut = new DataOutputStream(zstdOut);
+-             DataOutputStream fileDataOut = new DataOutputStream(fos)) {
+-
+-            fileDataOut.writeLong(SUPERBLOCK);
+-            fileDataOut.writeByte(V1_VERSION);
+-            fileDataOut.writeLong(timestamp);
+-            fileDataOut.writeByte(compressionLevel);
+-
+-            ArrayList<byte[]> decompressedChunks = new ArrayList<>(1024);
+-            for (int i = 0; i < 1024; i++) {
+-                if (chunkUncompressedSizes[i] != 0) {
+-                    chunkCount++;
+-                    byte[] decompressed = new byte[chunkUncompressedSizes[i]];
+-                    decompressor.decompress(chunkCompressedBuffers[i], 0, decompressed, 0, chunkUncompressedSizes[i]);
+-                    decompressedChunks.add(decompressed);
+-                } else {
+-                    decompressedChunks.add(null);
+-                }
+-            }
+-
+-            for (int i = 0; i < 1024; i++) {
+-                zstdDataOut.writeInt(chunkUncompressedSizes[i]);
+-                zstdDataOut.writeInt((int) chunkTimestamps[i]);
+-            }
++    public boolean isMarkedToSave() {
++        return markedToSave.getAndSet(false);
++    }
+ 
+-            for (int i = 0; i < 1024; i++) {
+-                if (decompressedChunks.get(i) != null) {
+-                    zstdDataOut.write(decompressedChunks.get(i));
+-                }
+-            }
+-            zstdDataOut.close();
+-
+-            fileDataOut.writeShort(chunkCount);
+-            byte[] compressedZstdData = zstdBAOS.toByteArray();
+-            fileDataOut.writeInt(compressedZstdData.length);
+-            fileDataOut.writeLong(0);
+-            fileDataOut.write(compressedZstdData);
+-            fileDataOut.writeLong(SUPERBLOCK);
+-
+-            fileDataOut.flush();
+-            fos.getFD().sync();
+-            fos.getChannel().force(true);
++    public void flushWrapper() {
++        try {
++            save();
++        } catch (IOException e) {
++            LOGGER.error("Failed to flush region file {}", path.toAbsolutePath(), e);
+         }
+-        Files.move(tempFile.toPath(), regionFilePath, StandardCopyOption.REPLACE_EXISTING);
+     }
+ 
+-    private void flushLinearV2() throws IOException {
+-        long timestamp = currentTimestamp();
+-        File tempFile = new File(regionFilePath.toString() + ".tmp");
+-
+-        try (FileOutputStream fos = new FileOutputStream(tempFile);
+-             DataOutputStream dataOut = new DataOutputStream(fos)) {
++    public boolean doesChunkExist(ChunkPos pos) {
++        return false;
++    }
+ 
+-            dataOut.writeLong(SUPERBLOCK);
+-            dataOut.writeByte(V2_VERSION);
+-            dataOut.writeLong(timestamp);
+-            dataOut.writeByte(gridSize);
++    private synchronized void save() throws IOException {
++        long timestamp = getTimestamp();
++        short chunkCount = 0;
+ 
+-            int[] regionCoords = parseRegionCoordinates(regionFilePath.getFileName().toString());
+-            dataOut.writeInt(regionCoords[0]);
+-            dataOut.writeInt(regionCoords[1]);
++        File tempFile = new File(path.toString() + ".tmp");
+ 
+-            boolean[] chunkExistence = new boolean[1024];
+-            for (int i = 0; i < 1024; i++) {
+-                chunkExistence[i] = (chunkUncompressedSizes[i] > 0);
+-            }
+-            writeExistenceBitmap(dataOut, chunkExistence);
++        try (FileOutputStream fileStream = new FileOutputStream(tempFile);
++             ByteArrayOutputStream zstdByteArray = new ByteArrayOutputStream();
++             ZstdOutputStream zstdStream = new ZstdOutputStream(zstdByteArray, this.compressionLevel);
++             DataOutputStream zstdDataStream = new DataOutputStream(zstdStream);
++             DataOutputStream dataStream = new DataOutputStream(fileStream)) {
+ 
+-            writeNBTFeatures(dataOut);
++            dataStream.writeLong(SUPERBLOCK);
++            dataStream.writeByte(VERSION);
++            dataStream.writeLong(timestamp);
++            dataStream.writeByte(this.compressionLevel);
+ 
+-            byte[][] buckets = buildBuckets();
++            ArrayList<byte[]> byteBuffers = new ArrayList<>();
++            for (int i = 0; i < 1024; i++) {
++                if (this.bufferUncompressedSize[i] != 0) {
++                    chunkCount += 1;
++                    byte[] content = new byte[bufferUncompressedSize[i]];
++                    this.decompressor.decompress(buffer[i], 0, content, 0, bufferUncompressedSize[i]);
+ 
+-            int bucketCount = gridSize * gridSize;
+-            for (int i = 0; i < bucketCount; i++) {
+-                dataOut.writeInt(buckets[i] != null ? buckets[i].length : 0);
+-                dataOut.writeByte(compressionLevel);
+-                long bucketHash = buckets[i] != null ? LongHashFunction.xx().hashBytes(buckets[i]) : 0;
+-                dataOut.writeLong(bucketHash);
++                    byteBuffers.add(content);
++                } else byteBuffers.add(null);
+             }
+-            for (int i = 0; i < bucketCount; i++) {
+-                if (buckets[i] != null) {
+-                    dataOut.write(buckets[i]);
+-                }
++            for (int i = 0; i < 1024; i++) {
++                zstdDataStream.writeInt(this.bufferUncompressedSize[i]); // Write uncompressed size
++                zstdDataStream.writeInt(this.chunkTimestamps[i]); // Write timestamp
+             }
+-            dataOut.writeLong(SUPERBLOCK);
+-
+-            dataOut.flush();
+-            fos.getFD().sync();
+-            fos.getChannel().force(true);
+-        }
+-        Files.move(tempFile.toPath(), regionFilePath, StandardCopyOption.REPLACE_EXISTING);
+-    }
+-
+-    private void writeNBTFeatures(DataOutputStream dataOut) throws IOException {
+-        dataOut.writeByte(0);
+-    }
+-
+-    private byte[][] buildBuckets() throws IOException {
+-        int bucketCount = gridSize * gridSize;
+-        byte[][] buckets = new byte[bucketCount][];
+-
+-        for (int bx = 0; bx < gridSize; bx++) {
+-            for (int bz = 0; bz < gridSize; bz++) {
+-                int bucketIdx = bx * gridSize + bz;
+-                if (bucketBuffers != null && bucketBuffers[bucketIdx] != null) {
+-                    buckets[bucketIdx] = bucketBuffers[bucketIdx];
+-                    continue;
+-                }
+-
+-                try (ByteArrayOutputStream bucketBAOS = new ByteArrayOutputStream();
+-                     ZstdOutputStream bucketZstdOut = new ZstdOutputStream(bucketBAOS, compressionLevel);
+-                     DataOutputStream bucketDataOut = new DataOutputStream(bucketZstdOut)) {
+-
+-                    boolean hasData = false;
+-                    int cellCount = 32 / gridSize;
+-                    for (int cx = 0; cx < cellCount; cx++) {
+-                        for (int cz = 0; cz < cellCount; cz++) {
+-                            int chunkIndex = (bx * cellCount + cx) + (bz * cellCount + cz) * 32;
+-                            if (chunkUncompressedSizes[chunkIndex] > 0) {
+-                                hasData = true;
+-                                byte[] chunkData = new byte[chunkUncompressedSizes[chunkIndex]];
+-                                decompressor.decompress(chunkCompressedBuffers[chunkIndex], 0, chunkData, 0, chunkUncompressedSizes[chunkIndex]);
+-                                bucketDataOut.writeInt(chunkData.length + 8);
+-                                bucketDataOut.writeLong(chunkTimestamps[chunkIndex]);
+-                                bucketDataOut.write(chunkData);
+-                            } else {
+-                                bucketDataOut.writeInt(0);
+-                                bucketDataOut.writeLong(chunkTimestamps[chunkIndex]);
+-                            }
+-                        }
+-                    }
+-                    bucketDataOut.close();
+-                    if (hasData) {
+-                        buckets[bucketIdx] = bucketBAOS.toByteArray();
+-                    }
+-                }
++            for (int i = 0; i < 1024; i++) {
++                if (byteBuffers.get(i) != null)
++                    zstdDataStream.write(byteBuffers.get(i), 0, byteBuffers.get(i).length);
+             }
+-        }
+-        return buckets;
+-    }
++            zstdDataStream.close();
+ 
+-    private void openBucketForChunk(int chunkX, int chunkZ) {
+-        int modX = Math.floorMod(chunkX, 32);
+-        int modZ = Math.floorMod(chunkZ, 32);
+-        int bucketIdx = chunkToBucketIndex(modX, modZ);
+-        if (bucketBuffers == null || bucketBuffers[bucketIdx] == null) {
+-            return;
+-        }
+-
+-        try (ByteArrayInputStream bucketBAIS = new ByteArrayInputStream(bucketBuffers[bucketIdx]);
+-             ZstdInputStream bucketZstdIn = new ZstdInputStream(bucketBAIS)) {
++            dataStream.writeShort(chunkCount);
+ 
+-            ByteBuffer bucketBuffer = ByteBuffer.wrap(bucketZstdIn.readAllBytes());
+-            int cellsPerBucket = 32 / gridSize;
+-            int bx = modX / bucketSize, bz = modZ / bucketSize;
+-            for (int cx = 0; cx < cellsPerBucket; cx++) {
+-                for (int cz = 0; cz < cellsPerBucket; cz++) {
+-                    int chunkIndex = (bx * cellsPerBucket + cx) + (bz * cellsPerBucket + cz) * 32;
+-                    int chunkSize = bucketBuffer.getInt();
+-                    long timestamp = bucketBuffer.getLong();
+-                    chunkTimestamps[chunkIndex] = timestamp;
++            byte[] compressed = zstdByteArray.toByteArray();
+ 
+-                    if (chunkSize > 0) {
+-                        byte[] chunkData = new byte[chunkSize - 8];
+-                        bucketBuffer.get(chunkData);
++            dataStream.writeInt(compressed.length);
++            dataStream.writeLong(0);
+ 
+-                        int maxCompressedLength = compressor.maxCompressedLength(chunkData.length);
+-                        byte[] compressed = new byte[maxCompressedLength];
+-                        int compressedLength = compressor.compress(chunkData, 0, chunkData.length, compressed, 0, maxCompressedLength);
+-                        byte[] finalCompressed = new byte[compressedLength];
+-                        System.arraycopy(compressed, 0, finalCompressed, 0, compressedLength);
++            dataStream.write(compressed, 0, compressed.length);
++            dataStream.writeLong(SUPERBLOCK);
+ 
+-                        chunkCompressedBuffers[chunkIndex] = finalCompressed;
+-                        chunkUncompressedSizes[chunkIndex] = chunkData.length;
+-                    }
+-                }
+-            }
+-        } catch (IOException ex) {
+-            throw new RuntimeException("Region file corrupted: " + regionFilePath + " bucket: " + bucketIdx, ex);
++            dataStream.flush();
++            fileStream.getFD().sync();
++            fileStream.getChannel().force(true); // Ensure atomicity on Btrfs
+         }
+-        bucketBuffers[bucketIdx] = null;
++        Files.move(tempFile.toPath(), this.path, StandardCopyOption.REPLACE_EXISTING);
+     }
+ 
+-    @Override
+     public synchronized void write(ChunkPos pos, ByteBuffer buffer) {
+-        openRegionFile();
+-        openBucketForChunk(pos.x, pos.z);
+         try {
+-            byte[] rawData = toByteArray(new ByteArrayInputStream(buffer.array()));
+-            int uncompressedSize = rawData.length;
+-            if (uncompressedSize > MAX_CHUNK_SIZE) {
+-                LOGGER.error("Chunk dupe attempt {}", regionFilePath);
+-                clear(pos);
+-            } else {
+-                int maxCompressedLength = compressor.maxCompressedLength(uncompressedSize);
+-                byte[] compressed = new byte[maxCompressedLength];
+-                int compressedLength = compressor.compress(rawData, 0, uncompressedSize, compressed, 0, maxCompressedLength);
+-                byte[] finalCompressed = new byte[compressedLength];
+-                System.arraycopy(compressed, 0, finalCompressed, 0, compressedLength);
+-
+-                int index = getChunkIndex(pos.x, pos.z);
+-                chunkCompressedBuffers[index] = finalCompressed;
+-                chunkTimestamps[index] = currentTimestamp();
+-                chunkUncompressedSizes[index] = uncompressedSize;
+-            }
++            byte[] b = toByteArray(new ByteArrayInputStream(buffer.array()));
++            int uncompressedSize = b.length;
++
++            int maxCompressedLength = this.compressor.maxCompressedLength(b.length);
++            byte[] compressed = new byte[maxCompressedLength];
++            int compressedLength = this.compressor.compress(b, 0, b.length, compressed, 0, maxCompressedLength);
++            b = new byte[compressedLength];
++            System.arraycopy(compressed, 0, b, 0, compressedLength);
++
++            int index = getChunkIndex(pos.x, pos.z);
++            this.buffer[index] = b;
++            this.chunkTimestamps[index] = getTimestamp();
++            this.bufferUncompressedSize[getChunkIndex(pos.x, pos.z)] = uncompressedSize;
+         } catch (IOException e) {
+-            LOGGER.error("Chunk write IOException {} {}", e, regionFilePath);
++            LOGGER.error("Chunk write IOException {} {}", e, this.path);
+         }
+         markToSave();
+     }
+ 
+-    @Override
+     public DataOutputStream getChunkDataOutputStream(ChunkPos pos) {
+-        openRegionFile();
+-        openBucketForChunk(pos.x, pos.z);
+         return new DataOutputStream(new BufferedOutputStream(new ChunkBuffer(pos)));
+     }
+ 
+-    @Override
+-    public MoonriseRegionFileIO.RegionDataController.WriteData moonrise$startWrite(CompoundTag data, ChunkPos pos) {
+-        DataOutputStream out = getChunkDataOutputStream(pos);
+-        return new ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.WriteData(
+-            data,
+-            ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.WriteData.WriteResult.WRITE,
+-            out,
+-            regionFile -> {
+-                try {
+-                    out.close();
+-                } catch (IOException e) {
+-                    LOGGER.error("Failed to close region file stream", e);
+-                }
+-            }
+-        );
+-    }
+-
+-    private class ChunkBuffer extends ByteArrayOutputStream {
+-        private final ChunkPos pos;
+-        public ChunkBuffer(ChunkPos pos) {
+-            super();
+-            this.pos = pos;
+-        }
+-        @Override
+-        public void close() {
+-            ByteBuffer byteBuffer = ByteBuffer.wrap(this.buf, 0, this.count);
+-            LinearRegionFile.this.write(this.pos, byteBuffer);
+-        }
+-    }
+-
+     private byte[] toByteArray(InputStream in) throws IOException {
+         ByteArrayOutputStream out = new ByteArrayOutputStream();
+         byte[] tempBuffer = new byte[4096];
++
+         int length;
+         while ((length = in.read(tempBuffer)) >= 0) {
+             out.write(tempBuffer, 0, length);
+         }
++
+         return out.toByteArray();
+     }
+ 
+     @Nullable
+-    @Override
+     public synchronized DataInputStream getChunkDataInputStream(ChunkPos pos) {
+-        openRegionFile();
+-        openBucketForChunk(pos.x, pos.z);
+-        int index = getChunkIndex(pos.x, pos.z);
+-        if (chunkUncompressedSizes[index] != 0) {
+-            byte[] decompressed = new byte[chunkUncompressedSizes[index]];
+-            decompressor.decompress(chunkCompressedBuffers[index], 0, decompressed, 0, chunkUncompressedSizes[index]);
+-            return new DataInputStream(new ByteArrayInputStream(decompressed));
++        if (this.bufferUncompressedSize[getChunkIndex(pos.x, pos.z)] != 0) {
++            byte[] content = new byte[bufferUncompressedSize[getChunkIndex(pos.x, pos.z)]];
++            this.decompressor.decompress(this.buffer[getChunkIndex(pos.x, pos.z)], 0, content, 0, bufferUncompressedSize[getChunkIndex(pos.x, pos.z)]);
++            return new DataInputStream(new ByteArrayInputStream(content));
+         }
+         return null;
+     }
+ 
+-    @Override
+-    public synchronized void clear(ChunkPos pos) {
+-        openRegionFile();
+-        openBucketForChunk(pos.x, pos.z);
+-        int index = getChunkIndex(pos.x, pos.z);
+-        chunkCompressedBuffers[index] = null;
+-        chunkUncompressedSizes[index] = 0;
+-        chunkTimestamps[index] = 0;
++    public void clear(ChunkPos pos) {
++        int i = getChunkIndex(pos.x, pos.z);
++        this.buffer[i] = null;
++        this.bufferUncompressedSize[i] = 0;
++        this.chunkTimestamps[i] = getTimestamp();
+         markToSave();
+     }
+ 
+-    @Override
+-    public synchronized void close() throws IOException {
+-        openRegionFile();
+-        close = true;
+-        try {
+-            flush();
+-        } catch (IOException e) {
+-            throw new IOException("Region flush IOException " + e + " " + regionFilePath, e);
+-        }
+-    }
+-
+-    private static int getChunkIndex(int x, int z) {
+-        return (x & 31) + ((z & 31) << 5);
++    public boolean hasChunk(ChunkPos pos) {
++        return this.bufferUncompressedSize[getChunkIndex(pos.x, pos.z)] > 0;
+     }
+ 
+-    private static int currentTimestamp() {
+-        return (int) (System.currentTimeMillis() / 1000L);
++    public void close() throws IOException {
++        if (closed) return;
++        closed = true;
++        flush(); // sync
+     }
+ 
+-    @Override
+     public boolean recalculateHeader() {
+         return false;
+     }
+ 
+-    @Override
+     public void setOversized(int x, int z, boolean something) {
+-        // stub
+     }
+ 
+-    @Override
+     public CompoundTag getOversizedData(int x, int z) throws IOException {
+-        throw new IOException("getOversizedData is a stub " + regionFilePath);
++        throw new IOException("getOversizedData is a stub " + this.path);
+     }
+ 
+-    @Override
+     public boolean isOversized(int x, int z) {
+         return false;
+     }
+ 
+     @Override
+-    public Path getPath() {
+-        return regionFilePath;
+-    }
++    public MoonriseRegionFileIO.RegionDataController.WriteData moonrise$startWrite(CompoundTag data, ChunkPos pos) {
++        final DataOutputStream out = this.getChunkDataOutputStream(pos);
+ 
+-    private boolean[] deserializeExistenceBitmap(ByteBuffer buffer) {
+-        boolean[] result = new boolean[1024];
+-        for (int i = 0; i < 128; i++) {
+-            byte b = buffer.get();
+-            for (int j = 0; j < 8; j++) {
+-                result[i * 8 + j] = ((b >> (7 - j)) & 1) == 1;
+-            }
+-        }
+-        return result;
++        return new ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.WriteData(
++            data, ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.RegionDataController.WriteData.WriteResult.WRITE,
++            out, regionFile -> out.close()
++        );
+     }
+ 
+-    private void writeExistenceBitmap(DataOutputStream out, boolean[] bitmap) throws IOException {
+-        for (int i = 0; i < 128; i++) {
+-            byte b = 0;
+-            for (int j = 0; j < 8; j++) {
+-                if (bitmap[i * 8 + j]) {
+-                    b |= (1 << (7 - j));
+-                }
+-            }
+-            out.writeByte(b);
+-        }
+-    }
++    private class ChunkBuffer extends ByteArrayOutputStream {
++        private final ChunkPos pos;
+ 
+-    private int chunkToBucketIndex(int chunkX, int chunkZ) {
+-        int bx = chunkX / bucketSize, bz = chunkZ / bucketSize;
+-        return bx * gridSize + bz;
+-    }
++        public ChunkBuffer(ChunkPos chunkcoordintpair) {
++            super();
++            this.pos = chunkcoordintpair;
++        }
+ 
+-    private int[] parseRegionCoordinates(String fileName) {
+-        int regionX = 0;
+-        int regionZ = 0;
+-        String[] parts = fileName.split("\\.");
+-        if (parts.length >= 4) {
+-            try {
+-                regionX = Integer.parseInt(parts[1]);
+-                regionZ = Integer.parseInt(parts[2]);
+-            } catch (NumberFormatException e) {
+-                LOGGER.error("Failed to parse region coordinates from file name: {}", fileName, e);
+-            }
+-        } else {
+-            LOGGER.warn("Unexpected file name format: {}", fileName);
++        public void close() {
++            ByteBuffer bytebuffer = ByteBuffer.wrap(this.buf, 0, this.count);
++            LinearRegionFile.this.write(this.pos, bytebuffer);
+         }
+-        return new int[]{regionX, regionZ};
+     }
+ }
+diff --git a/src/main/java/org/bxteam/divinemc/region/LinearRegionFileFlusher.java b/src/main/java/org/bxteam/divinemc/region/LinearRegionFileFlusher.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..b598288e5aa0026e0df9967bdb6b07279a9541b3
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/region/LinearRegionFileFlusher.java
+@@ -0,0 +1,47 @@
++package org.bxteam.divinemc.region;
++
++import com.google.common.util.concurrent.ThreadFactoryBuilder;
++import org.bukkit.Bukkit;
++import org.bxteam.divinemc.DivineConfig;
++
++import java.util.Queue;
++import java.util.concurrent.*;
++
++public class LinearRegionFileFlusher {
++
++    private final Queue<LinearRegionFile> savingQueue = new LinkedBlockingQueue<>();
++    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
++            new ThreadFactoryBuilder()
++                    .setNameFormat("linear-flush-scheduler")
++                    .build()
++    );
++    private final ExecutorService executor = Executors.newFixedThreadPool(
++            DivineConfig.linearFlushMaxThreads,
++            new ThreadFactoryBuilder()
++                    .setNameFormat("linear-flusher-%d")
++                    .build()
++    );
++
++    public LinearRegionFileFlusher() {
++        Bukkit.getLogger().info("Using " + DivineConfig.linearFlushMaxThreads + " threads for linear region flushing.");
++        scheduler.scheduleAtFixedRate(this::pollAndFlush, 0L, DivineConfig.linearFlushDelay, TimeUnit.SECONDS);
++    }
++
++    public void scheduleSave(LinearRegionFile regionFile) {
++        if (savingQueue.contains(regionFile)) return;
++        savingQueue.add(regionFile);
++    }
++
++    private void pollAndFlush() {
++        while (!savingQueue.isEmpty()) {
++            LinearRegionFile regionFile = savingQueue.poll();
++            if (!regionFile.closed && regionFile.isMarkedToSave())
++                executor.execute(regionFile::flushWrapper);
++        }
++    }
++
++    public void shutdown() {
++        executor.shutdown();
++        scheduler.shutdown();
++    }
++}
+diff --git a/src/main/java/org/bxteam/divinemc/region/RegionFileFactory.java b/src/main/java/org/bxteam/divinemc/region/RegionFileFactory.java
+index fbcdd68d7e72c2a52112cd3c8c3ab7b774493285..321f5648836b47a1f0bd4f22170cbfe36e3bedaa 100644
+--- a/src/main/java/org/bxteam/divinemc/region/RegionFileFactory.java
++++ b/src/main/java/org/bxteam/divinemc/region/RegionFileFactory.java
+@@ -21,14 +21,9 @@ public class RegionFileFactory {
+         final String fullFileName = path.getFileName().toString();
+         final String[] fullNameSplit = fullFileName.split("\\.");
+         final String extensionName = fullNameSplit[fullNameSplit.length - 1];
+-        switch (RegionFileFormat.fromExtension(extensionName)) {
+-            case LINEAR -> {
+-                return new LinearRegionFile(path, DivineConfig.linearImplementation, DivineConfig.linearCompressionLevel);
+-            }
+-
+-            default -> {
+-                return new RegionFile(storageKey, path, directory, compressionFormat, dsync);
+-            }
++        if (RegionFileFormat.fromExtension(extensionName) == RegionFileFormat.LINEAR) {
++            return new LinearRegionFile(path, DivineConfig.linearCompressionLevel);
+         }
++        return new RegionFile(storageKey, path, directory, compressionFormat, dsync);
+     }
+ }
+diff --git a/src/main/java/org/bxteam/divinemc/region/RegionFileFormat.java b/src/main/java/org/bxteam/divinemc/region/RegionFileFormat.java
+index 30a54e569c1923d53bc68e8ffbdb0a969a037b6c..9053611ec0bc29e9dcbd4d8ed0dc32c60e3dbbc1 100644
+--- a/src/main/java/org/bxteam/divinemc/region/RegionFileFormat.java
++++ b/src/main/java/org/bxteam/divinemc/region/RegionFileFormat.java
+@@ -37,6 +37,7 @@ public enum RegionFileFormat {
+     }
+ 
+     @Contract(pure = true)
++    @NotNull
+     public static RegionFileFormat fromExtension(@NotNull String name) {
+         switch (name.toLowerCase()) {
+             case "mca", "anvil" -> {
