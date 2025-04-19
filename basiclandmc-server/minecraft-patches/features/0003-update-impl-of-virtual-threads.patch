@@ -114,7 +114,7 @@ index dee93ae262a2a06e68dfe8ae1b7193172c436990..62bf29da2f44f8bb2ea1dc2a2a51a6e5
      public final ChatDecorator improvedChatDecorator = new io.papermc.paper.adventure.ImprovedChatDecorator(this); // Paper - adventure
  
 diff --git a/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-index c3e8da14d4faf560d24f877ef9eeb4a5dcb2aa8d..2dcb72bea66ee001931fa28d20d36cc0f77a2fc3 100644
+index c3e8da14d4faf560d24f877ef9eeb4a5dcb2aa8d..b1fd00bed129feb96b998e7e1169fed1e9c3ad22 100644
 --- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 @@ -809,9 +809,20 @@ public class ServerGamePacketListenerImpl
@@ -136,7 +136,7 @@ index c3e8da14d4faf560d24f877ef9eeb4a5dcb2aa8d..2dcb72bea66ee001931fa28d20d36cc0
 +            threadFactoryBuilder.setThreadFactory(Thread.ofVirtual().factory());
 +        }
 +
-+        TAB_COMPLETE_EXECUTOR = java.util.concurrent.Executors.newFixedThreadPool(4, threadFactoryBuilder.build());
++        TAB_COMPLETE_EXECUTOR = java.util.concurrent.Executors.newThreadPerTaskExecutor(threadFactoryBuilder.build());
 +    }
      // DivineMC end - Virtual Threads
      // Paper end - AsyncTabCompleteEvent
