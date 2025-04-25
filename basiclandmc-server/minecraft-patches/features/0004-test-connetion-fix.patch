@@ -1,0 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <pirkldan28@gmail.com>
+Date: Thu, 24 Apr 2025 21:03:19 +0200
+Subject: [PATCH] test-connetion-fix
+
+
+diff --git a/net/minecraft/network/Connection.java b/net/minecraft/network/Connection.java
+index 00a82873d226f113278632a53c0faca420dd67d4..91db646f7def925dd4cd281dfaac94302eec8d38 100644
+--- a/net/minecraft/network/Connection.java
++++ b/net/minecraft/network/Connection.java
+@@ -325,7 +325,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
+ 
+     private static void syncAfterConfigurationChange(ChannelFuture future) {
+         try {
+-            future.syncUninterruptibly();
++            future.awaitUninterruptibly(5000L);
+         } catch (Exception var2) {
+             if (var2 instanceof ClosedChannelException) {
+                 LOGGER.info("Connection closed during protocol change");
