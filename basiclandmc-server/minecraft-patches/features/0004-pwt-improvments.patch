@@ -1,0 +1,377 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <pirkldan28@gmail.com>
+Date: Tue, 6 May 2025 13:28:19 +0200
+Subject: [PATCH] pwt-improvments
+
+
+diff --git a/net/minecraft/server/level/ServerChunkCache.java b/net/minecraft/server/level/ServerChunkCache.java
+index a2bb32b964d08079456d93d49f12b23f7c17a7db..eb33e68c812c3bd1ae66103c03e8bccc31d1c0e0 100644
+--- a/net/minecraft/server/level/ServerChunkCache.java
++++ b/net/minecraft/server/level/ServerChunkCache.java
+@@ -56,7 +56,6 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+     private final ServerLevel level;
+     // DivineMC - Regionized Chunk Ticking
+     public static final Executor REGION_EXECUTOR = java.util.concurrent.Executors.newFixedThreadPool(org.bxteam.divinemc.DivineConfig.regionizedChunkTickingExecutorThreadCount, new org.bxteam.divinemc.util.NamedAgnosticThreadFactory<>("region_ticking", ca.spottedleaf.moonrise.common.util.TickThread::new, org.bxteam.divinemc.DivineConfig.regionizedChunkTickingExecutorThreadPriority));
+-    public volatile int tickingRegionsCount = 0;
+     // DivineMC end - Regionized Chunk Ticking
+     public final Thread mainThread;
+     final ThreadedLevelLightEngine lightEngine;
+@@ -474,38 +473,63 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+     private static final int[] DZ = {0, 0, 1, -1, 1, 1, -1, -1};
+ 
+     private List<LevelChunk>[] splitChunksIntoRegions(List<LevelChunk> chunks) {
++        if (chunks.isEmpty()) {
++            return new List[0];
++        }
++
+         int size = chunks.size();
+-        java.util.IdentityHashMap<LevelChunk, Boolean> chunkSet = new java.util.IdentityHashMap<>(size);
++        // Use FastUtil for better performance
++        it.unimi.dsi.fastutil.objects.Object2BooleanOpenHashMap<LevelChunk> chunkSet = new it.unimi.dsi.fastutil.objects.Object2BooleanOpenHashMap<>(size);
+ 
+         for (LevelChunk chunk : chunks) {
+-            chunkSet.put(chunk, Boolean.TRUE);
++            chunkSet.put(chunk, true);
+         }
+ 
+-        List<List<LevelChunk>> groups = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(size >> 3);
++        List<List<LevelChunk>> groups = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(Math.max(1, size / 16));
+         LevelChunk[] stack = new LevelChunk[size];
+-        int stackPointer = 0;
++        int stackPointer;
+ 
+         for (LevelChunk chunk : chunks) {
+-            if (chunkSet.remove(chunk) == null) continue;
++            if (!chunkSet.containsKey(chunk)) continue;
+ 
+-            List<LevelChunk> group = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(64);
+-            stack[stackPointer++] = chunk;
++            // Use FastUtil's array list for better performance
++            it.unimi.dsi.fastutil.objects.ObjectArrayList<LevelChunk> group = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(64);
++            stack[0] = chunk;
++            stackPointer = 1;
++            chunkSet.removeBoolean(chunk);
+ 
+             while (stackPointer > 0) {
+                 LevelChunk current = stack[--stackPointer];
+                 group.add(current);
+ 
+-                for (int i = 0; i < 8; i++) {
++                // Check direct neighbors first (cardinal directions)
++                for (int i = 0; i < 4; i++) {
++                    LevelChunk neighbor = getChunk(current.locX + DX[i], current.locZ + DZ[i], false);
++                    if (neighbor != null && chunkSet.removeBoolean(neighbor)) {
++                        stack[stackPointer++] = neighbor;
++                    }
++                }
++
++                // Then check diagonal neighbors
++                for (int i = 4; i < 8; i++) {
+                     LevelChunk neighbor = getChunk(current.locX + DX[i], current.locZ + DZ[i], false);
+-                    if (neighbor == null || chunkSet.remove(neighbor) == null) continue;
+-                    stack[stackPointer++] = neighbor;
++                    if (neighbor != null && chunkSet.removeBoolean(neighbor)) {
++                        stack[stackPointer++] = neighbor;
++                    }
+                 }
+             }
+ 
+             groups.add(group);
++
++            // Early exit if all chunks are processed
++            if (chunkSet.isEmpty()) {
++                break;
++            }
+         }
+ 
+-        return groups.toArray(new List[0]);
++        @SuppressWarnings("unchecked")
++        List<LevelChunk>[] result = new List[groups.size()];
++        return groups.toArray(result);
+     }
+     // DivineMC end - Regionized Chunk Ticking
+ 
+@@ -527,75 +551,56 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+     }
+ 
+     private void tickChunks() {
+-        long gameTime = this.level.getGameTime();
+-        long l = gameTime - this.lastInhabitedUpdate;
++        final long gameTime = this.level.getGameTime();
++        final long l = gameTime - this.lastInhabitedUpdate;
+         this.lastInhabitedUpdate = gameTime;
+-        if (!this.level.isDebug()) {
+-            if (this.level.tickRateManager().runsNormally()) {
+-                List<LevelChunk> list = this.tickingChunks;
+-
+-                try {
+-                    this.collectTickingChunks(list);
+-                    // Paper start - chunk tick iteration optimisation
+-                    this.shuffleRandom.setSeed(this.level.random.nextLong());
+-                    if (!this.level.paperConfig().entities.spawning.perPlayerMobSpawns) Util.shuffle(list, this.shuffleRandom); // Paper - Optional per player mob spawns; do not need this when per-player is enabled
+-                    // Paper end - chunk tick iteration optimisation
+-                    // DivineMC start - Regionized Chunk Ticking
+-                    if (org.bxteam.divinemc.DivineConfig.enableRegionizedChunkTicking) {
+-                        List<LevelChunk>[] regions = splitChunksIntoRegions(list);
+-                        int regionCount = regions.length;
+-                        this.tickingRegionsCount = regionCount;
+-                        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(regionCount);
+-
+-                        try {
+-                            java.util.concurrent.ForkJoinPool.managedBlock(new java.util.concurrent.ForkJoinPool.ManagedBlocker() {
+-                                @Override
+-                                public boolean block() throws InterruptedException {
+-                                    for (List<LevelChunk> region : regions) {
+-                                        if (region == null) continue;
+-                                        REGION_EXECUTOR.execute(() -> {
+-                                            try {
+-                                                tickChunks(l, region);
+-                                            } finally {
+-                                                latch.countDown();
+-                                            }
+-                                        });
+-                                    }
+-
+-                                    latch.await();
+-                                    return true;
+-                                }
+-
+-                                @Override
+-                                public boolean isReleasable() {
+-                                    return latch.getCount() == 0;
+-                                }
+-                            });
+-                        } catch (InterruptedException ex) {
+-                            throw new RuntimeException("Interrupted managed block during region ticking", ex);
+-                        }
+-                    } else {
+-                        this.tickChunks(l, list);
+-                    }
+-                    // DivineMC end - Regionized Chunk Ticking
+-                } finally {
+-                    list.clear();
+-                }
+-            }
+ 
++        if (this.level.isDebug()) {
++            return;
++        }
++
++        if (!this.level.tickRateManager().runsNormally()) {
+             this.broadcastChangedChunks();
++            return;
+         }
+ 
++        final List<LevelChunk> list = this.tickingChunks;
++
++        try {
++            this.collectTickingChunks(list);
++
++            if (list.isEmpty()) {
++                return;
++            }
++
++            // Paper start - chunk tick iteration optimisation
++            this.shuffleRandom.setSeed(this.level.random.nextLong());
++
++            if (!this.level.paperConfig().entities.spawning.perPlayerMobSpawns) {
++                Util.shuffle(list, this.shuffleRandom); // Paper - Optional per player mob spawns; do not need this when per-player is enabled
++            }
++            // Paper end - chunk tick iteration optimisation
++
++            // DivineMC start - Regionized Chunk Ticking
++            if (org.bxteam.divinemc.DivineConfig.enableRegionizedChunkTicking) {
++                this.processChunksRegionized(l, list);
++            } else {
++                this.tickChunks(l, list);
++            }
++            // DivineMC end - Regionized Chunk Ticking
++        } finally {
++            list.clear();
++        }
++
++        this.broadcastChangedChunks();
++
+         // DivineMC start - Async mob spawning
+         if (org.bxteam.divinemc.DivineConfig.enableAsyncSpawning) {
+             for (ServerPlayer player : this.level.players) {
+                 for (int ii = 0; ii < ServerPlayer.MOBCATEGORY_TOTAL_ENUMS; ii++) {
+                     player.mobCounts[ii] = 0;
+ 
+-                    int newBackoff = player.mobBackoffCounts[ii] - 1;
+-                    if (newBackoff < 0) {
+-                        newBackoff = 0;
+-                    }
++                    int newBackoff = Math.max(0, player.mobBackoffCounts[ii] - 1);
+                     player.mobBackoffCounts[ii] = newBackoff;
+                 }
+             }
+@@ -607,15 +612,65 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+                 MinecraftServer.getServer().mobSpawnExecutor.submit(() -> {
+                     int mapped = distanceManager.getNaturalSpawnChunkCount();
+                     try {
+-                        lastSpawnState = NaturalSpawner.createState(mapped, new ArrayList<>(level.entityTickList.entities), this::getFullChunk, new LocalMobCapCalculator(this.chunkMap), true);
+-                    } finally { }
+-                    spawnCountsReady.set(true);
++                        lastSpawnState = NaturalSpawner.createState(
++                            mapped,
++                            new ArrayList<>(level.entityTickList.entities),
++                            this::getFullChunk,
++                            new LocalMobCapCalculator(this.chunkMap),
++                            true
++                        );
++                    } finally {
++                        spawnCountsReady.set(true);
++                    }
+                 });
+             }
+         }
+         // DivineMC end - Async mob spawning
+     }
+ 
++    private void processChunksRegionized(final long timeDelta, final List<LevelChunk> chunks) {
++        final List<LevelChunk>[] regions = splitChunksIntoRegions(chunks);
++        final int regionCount = regions.length;
++
++        if (regionCount == 0) {
++            return;
++        }
++
++        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(regionCount);
++
++        try {
++            java.util.concurrent.ForkJoinPool.managedBlock(new java.util.concurrent.ForkJoinPool.ManagedBlocker() {
++                @Override
++                public boolean block() throws InterruptedException {
++                    for (final List<LevelChunk> region : regions) {
++                        if (region == null || region.isEmpty()) {
++                            latch.countDown();
++                            continue;
++                        }
++
++                        REGION_EXECUTOR.execute(() -> {
++                            try {
++                                tickChunks(timeDelta, region);
++                            } finally {
++                                latch.countDown();
++                            }
++                        });
++                    }
++
++                    latch.await();
++                    return true;
++                }
++
++                @Override
++                public boolean isReleasable() {
++                    return latch.getCount() == 0;
++                }
++            });
++        } catch (InterruptedException ex) {
++            throw new RuntimeException("Interrupted managed block during region ticking", ex);
++        }
++    }
++
+     private void broadcastChangedChunks() {
+         for (ChunkHolder chunkHolder : this.chunkHoldersToBroadcast) {
+             LevelChunk tickingChunk = chunkHolder.getChunkToSend(); // Paper - rewrite chunk system
+diff --git a/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java b/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java
+index 028eae2f9a459b60e92f3344091083aa93b54485..c07fa0feeb9e186ef63bc97210309f0f8af6a6cf 100644
+--- a/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java
++++ b/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java
+@@ -17,8 +17,8 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
+     private static final Logger LOGGER = LogUtils.getLogger();
+     private final Level level;
+     private final int maxChainedNeighborUpdates;
+-    private final ArrayDeque<CollectingNeighborUpdater.NeighborUpdates> stack = new ArrayDeque<>();
+-    private final List<CollectingNeighborUpdater.NeighborUpdates> addedThisLayer = new ArrayList<>();
++    private final ArrayDeque<NeighborUpdates> stack = new ArrayDeque<>();
++    private final List<NeighborUpdates> addedThisLayer = new ArrayList<>();
+     private int count = 0;
+ 
+     public CollectingNeighborUpdater(Level level, int maxChainedNeighborUpdates) {
+@@ -28,25 +28,25 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
+ 
+     @Override
+     public void shapeUpdate(Direction direction, BlockState state, BlockPos pos, BlockPos neighborPos, int flags, int recursionLevel) {
+-        this.addAndRun(pos, new CollectingNeighborUpdater.ShapeUpdate(direction, state, pos.immutable(), neighborPos.immutable(), flags, recursionLevel));
++        this.addAndRun(pos, new ShapeUpdate(direction, state, pos.immutable(), neighborPos.immutable(), flags, recursionLevel));
+     }
+ 
+     @Override
+     public void neighborChanged(BlockPos pos, Block neighborBlock, @Nullable Orientation orientation) {
+-        this.addAndRun(pos, new CollectingNeighborUpdater.SimpleNeighborUpdate(pos, neighborBlock, orientation));
++        this.addAndRun(pos, new SimpleNeighborUpdate(pos, neighborBlock, orientation));
+     }
+ 
+     @Override
+     public void neighborChanged(BlockState state, BlockPos pos, Block neighborBlock, @Nullable Orientation orientation, boolean movedByPiston) {
+-        this.addAndRun(pos, new CollectingNeighborUpdater.FullNeighborUpdate(state, pos.immutable(), neighborBlock, orientation, movedByPiston));
++        this.addAndRun(pos, new FullNeighborUpdate(state, pos.immutable(), neighborBlock, orientation, movedByPiston));
+     }
+ 
+     @Override
+     public void updateNeighborsAtExceptFromFacing(BlockPos pos, Block block, @Nullable Direction facing, @Nullable Orientation orientation) {
+-        this.addAndRun(pos, new CollectingNeighborUpdater.MultiNeighborUpdate(pos.immutable(), block, orientation, facing));
++        this.addAndRun(pos, new MultiNeighborUpdate(pos.immutable(), block, orientation, facing));
+     }
+ 
+-    private void addAndRun(BlockPos pos, CollectingNeighborUpdater.NeighborUpdates updates) {
++    private synchronized void addAndRun(BlockPos pos, NeighborUpdates updates) {
+         boolean flag = this.count > 0;
+         boolean flag1 = this.maxChainedNeighborUpdates >= 0 && this.count >= this.maxChainedNeighborUpdates;
+         this.count++;
+@@ -65,7 +65,7 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
+         }
+     }
+ 
+-    private void runUpdates() {
++    private synchronized void runUpdates() {
+         try {
+             while (!this.stack.isEmpty() || !this.addedThisLayer.isEmpty()) {
+                 for (int i = this.addedThisLayer.size() - 1; i >= 0; i--) {
+@@ -73,7 +73,7 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
+                 }
+ 
+                 this.addedThisLayer.clear();
+-                CollectingNeighborUpdater.NeighborUpdates neighborUpdates = this.stack.peek();
++                NeighborUpdates neighborUpdates = this.stack.peek();
+ 
+                 while (this.addedThisLayer.isEmpty()) {
+                     if (!neighborUpdates.runNext(this.level)) {
+@@ -90,7 +90,7 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
+     }
+ 
+     record FullNeighborUpdate(BlockState state, BlockPos pos, Block block, @Nullable Orientation orientation, boolean movedByPiston)
+-        implements CollectingNeighborUpdater.NeighborUpdates {
++        implements NeighborUpdates {
+         @Override
+         public boolean runNext(Level level) {
+             NeighborUpdater.executeUpdate(level, this.state, this.pos, this.block, this.orientation, this.movedByPiston);
+@@ -98,7 +98,7 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
+         }
+     }
+ 
+-    static final class MultiNeighborUpdate implements CollectingNeighborUpdater.NeighborUpdates {
++    static final class MultiNeighborUpdate implements NeighborUpdates {
+         private final BlockPos sourcePos;
+         private final Block sourceBlock;
+         @Nullable
+@@ -147,7 +147,7 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
+     }
+ 
+     record ShapeUpdate(Direction direction, BlockState neighborState, BlockPos pos, BlockPos neighborPos, int updateFlags, int updateLimit)
+-        implements CollectingNeighborUpdater.NeighborUpdates {
++        implements NeighborUpdates {
+         @Override
+         public boolean runNext(Level level) {
+             NeighborUpdater.executeShapeUpdate(level, this.direction, this.pos, this.neighborPos, this.neighborState, this.updateFlags, this.updateLimit);
+@@ -155,7 +155,7 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
+         }
+     }
+ 
+-    record SimpleNeighborUpdate(BlockPos pos, Block block, @Nullable Orientation orientation) implements CollectingNeighborUpdater.NeighborUpdates {
++    record SimpleNeighborUpdate(BlockPos pos, Block block, @Nullable Orientation orientation) implements NeighborUpdates {
+         @Override
+         public boolean runNext(Level level) {
+             BlockState blockState = level.getBlockState(this.pos);
