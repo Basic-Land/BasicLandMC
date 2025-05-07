@@ -5,7 +5,7 @@ Subject: [PATCH] pwt-improvments
 
 
 diff --git a/net/minecraft/server/level/ServerChunkCache.java b/net/minecraft/server/level/ServerChunkCache.java
-index a2bb32b964d08079456d93d49f12b23f7c17a7db..eb33e68c812c3bd1ae66103c03e8bccc31d1c0e0 100644
+index a2bb32b964d08079456d93d49f12b23f7c17a7db..bab2d6ce43d31d78ff376d3901c989db2e85a445 100644
 --- a/net/minecraft/server/level/ServerChunkCache.java
 +++ b/net/minecraft/server/level/ServerChunkCache.java
 @@ -56,7 +56,6 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
@@ -16,6 +16,15 @@ index a2bb32b964d08079456d93d49f12b23f7c17a7db..eb33e68c812c3bd1ae66103c03e8bccc
      // DivineMC end - Regionized Chunk Ticking
      public final Thread mainThread;
      final ThreadedLevelLightEngine lightEngine;
+@@ -71,7 +70,7 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+     private final ChunkStatus[] lastChunkStatus = new ChunkStatus[4];
+     private final ChunkAccess[] lastChunk = new ChunkAccess[4];
+     private final List<LevelChunk> tickingChunks = new ArrayList<>();
+-    private final Set<ChunkHolder> chunkHoldersToBroadcast = new ReferenceOpenHashSet<>();
++    private final Set<ChunkHolder> chunkHoldersToBroadcast = java.util.Collections.synchronizedSet(new ReferenceOpenHashSet<>());
+     @Nullable
+     @VisibleForDebug
+     private NaturalSpawner.SpawnState lastSpawnState;
 @@ -474,38 +473,63 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
      private static final int[] DZ = {0, 0, 1, -1, 1, 1, -1, -1};
  
@@ -206,7 +215,7 @@ index a2bb32b964d08079456d93d49f12b23f7c17a7db..eb33e68c812c3bd1ae66103c03e8bccc
                      player.mobBackoffCounts[ii] = newBackoff;
                  }
              }
-@@ -607,15 +612,65 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+@@ -607,24 +612,75 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
                  MinecraftServer.getServer().mobSpawnExecutor.submit(() -> {
                      int mapped = distanceManager.getNaturalSpawnChunkCount();
                      try {
@@ -273,8 +282,24 @@ index a2bb32b964d08079456d93d49f12b23f7c17a7db..eb33e68c812c3bd1ae66103c03e8bccc
 +    }
 +
      private void broadcastChangedChunks() {
-         for (ChunkHolder chunkHolder : this.chunkHoldersToBroadcast) {
-             LevelChunk tickingChunk = chunkHolder.getChunkToSend(); // Paper - rewrite chunk system
+-        for (ChunkHolder chunkHolder : this.chunkHoldersToBroadcast) {
+-            LevelChunk tickingChunk = chunkHolder.getChunkToSend(); // Paper - rewrite chunk system
+-            if (tickingChunk != null) {
+-                chunkHolder.broadcastChanges(tickingChunk);
++        synchronized (chunkHoldersToBroadcast) {
++            for (ChunkHolder chunkHolder : this.chunkHoldersToBroadcast) {
++                LevelChunk tickingChunk = chunkHolder.getChunkToSend(); // Paper - rewrite chunk system
++                if (tickingChunk != null) {
++                    chunkHolder.broadcastChanges(tickingChunk);
++                }
+             }
++            this.chunkHoldersToBroadcast.clear();
+         }
+-
+-        this.chunkHoldersToBroadcast.clear();
+     }
+ 
+     private void collectTickingChunks(List<LevelChunk> output) {
 diff --git a/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java b/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java
 index 028eae2f9a459b60e92f3344091083aa93b54485..c07fa0feeb9e186ef63bc97210309f0f8af6a6cf 100644
 --- a/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java
