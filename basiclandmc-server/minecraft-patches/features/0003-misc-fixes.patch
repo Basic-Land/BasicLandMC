@@ -17,6 +17,43 @@ index 00a82873d226f113278632a53c0faca420dd67d4..91db646f7def925dd4cd281dfaac9430
          } catch (Exception var2) {
              if (var2 instanceof ClosedChannelException) {
                  LOGGER.info("Connection closed during protocol change");
+diff --git a/net/minecraft/server/level/ServerLevel.java b/net/minecraft/server/level/ServerLevel.java
+index bea62fca118efdd6257188cd53c813dc5fd0c19c..23fc3a8e12fdfcb09fbcfb9f0bb3b15ef17dd4e4 100644
+--- a/net/minecraft/server/level/ServerLevel.java
++++ b/net/minecraft/server/level/ServerLevel.java
+@@ -193,7 +193,7 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+     private final LevelTicks<Block> blockTicks = new LevelTicks<>(this::isPositionTickingWithEntitiesLoaded);
+     private final LevelTicks<Fluid> fluidTicks = new LevelTicks<>(this::isPositionTickingWithEntitiesLoaded);
+     private final PathTypeCache pathTypesByPosCache = new PathTypeCache();
+-    final Set<Mob> navigatingMobs = new ObjectOpenHashSet<>();
++    final Set<Mob> navigatingMobs = java.util.Collections.synchronizedSet(new ObjectOpenHashSet<>());
+     volatile boolean isUpdatingNavigations;
+     protected final Raids raids;
+     private final ObjectLinkedOpenHashSet<BlockEventData> blockEvents = new ObjectLinkedOpenHashSet<>();
+@@ -1794,22 +1794,14 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+         if (Shapes.joinIsNotEmpty(collisionShape, collisionShape1, BooleanOp.NOT_SAME)) {
+             List<PathNavigation> list = new ObjectArrayList<>();
+ 
+-            try { // Paper - catch CME see below why
++            synchronized (this.navigatingMobs) {
+             for (Mob mob : this.navigatingMobs) {
+                 PathNavigation navigation = mob.getNavigation();
+                 if (navigation.shouldRecomputePath(pos)) {
+                     list.add(navigation);
+                 }
+             }
+-            // Paper start - catch CME see below why
+-            } catch (final java.util.ConcurrentModificationException concurrentModificationException) {
+-                // This can happen because the pathfinder update below may trigger a chunk load, which in turn may cause more navigators to register
+-                // In this case we just run the update again across all the iterators as the chunk will then be loaded
+-                // As this is a relative edge case it is much faster than copying navigators (on either read or write)
+-                this.sendBlockUpdated(pos, oldState, newState, flags);
+-                return;
+             }
+-            // Paper end - catch CME see below why
+ 
+             try {
+                 this.isUpdatingNavigations = true;
 diff --git a/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 index b1fd00bed129feb96b998e7e1169fed1e9c3ad22..9b7fe936b3a85c782e051334162222ed943478f8 100644
 --- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
