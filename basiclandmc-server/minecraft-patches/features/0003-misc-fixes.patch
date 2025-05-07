@@ -4,19 +4,6 @@ Date: Thu, 24 Apr 2025 21:03:19 +0200
 Subject: [PATCH] misc-fixes
 
 
-diff --git a/com/mojang/brigadier/tree/CommandNode.java b/com/mojang/brigadier/tree/CommandNode.java
-index 00a63a6a5983e6a25f2a9014a2f9eefeda468cdf..a62a5c522edb3275a32ae40292920d3d41468d36 100644
---- a/com/mojang/brigadier/tree/CommandNode.java
-+++ b/com/mojang/brigadier/tree/CommandNode.java
-@@ -24,7 +24,7 @@ import java.util.concurrent.CompletableFuture;
- import java.util.function.Predicate;
- 
- public abstract class CommandNode<S> implements Comparable<CommandNode<S>> {
--    private final Map<String, CommandNode<S>> children = Collections.synchronizedMap(new LinkedHashMap<>()); // DivineMC - Misc Optimizations
-+    private final Map<String, CommandNode<S>> children = new java.util.concurrent.ConcurrentHashMap<>(); // DivineMC - Misc Optimizations
-     private final Map<String, LiteralCommandNode<S>> literals = new LinkedHashMap<>();
-     private final Map<String, ArgumentCommandNode<S, ?>> arguments = new LinkedHashMap<>();
-     public Predicate<S> requirement; // Paper - public-f
 diff --git a/net/minecraft/network/Connection.java b/net/minecraft/network/Connection.java
 index 00a82873d226f113278632a53c0faca420dd67d4..91db646f7def925dd4cd281dfaac94302eec8d38 100644
 --- a/net/minecraft/network/Connection.java
@@ -30,3 +17,16 @@ index 00a82873d226f113278632a53c0faca420dd67d4..91db646f7def925dd4cd281dfaac9430
          } catch (Exception var2) {
              if (var2 instanceof ClosedChannelException) {
                  LOGGER.info("Connection closed during protocol change");
+diff --git a/net/minecraft/world/level/Level.java b/net/minecraft/world/level/Level.java
+index 502473920a8dec1fcd3321d863f07c977b3643f2..199e7c8ca9cd860ac9e6e6ab0109a79b7465e3a5 100644
+--- a/net/minecraft/world/level/Level.java
++++ b/net/minecraft/world/level/Level.java
+@@ -115,7 +115,7 @@ public abstract class Level implements LevelAccessor, AutoCloseable, ca.spottedl
+     public static final int MIN_ENTITY_SPAWN_Y = -20000000;
+     public final org.bxteam.divinemc.util.BlockEntityTickersList blockEntityTickers = new org.bxteam.divinemc.util.BlockEntityTickersList(); // Paper - public // DivineMC - optimize block entity removals - Fix MC-117075
+     protected final NeighborUpdater neighborUpdater;
+-    private final List<TickingBlockEntity> pendingBlockEntityTickers = Lists.newArrayList();
++    private final List<TickingBlockEntity> pendingBlockEntityTickers = java.util.Collections.synchronizedList(Lists.newArrayList());
+     private boolean tickingBlockEntities;
+     public final Thread thread;
+     private final boolean isDebug;

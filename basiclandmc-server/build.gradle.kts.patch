@@ -63,7 +63,7 @@
  
      // DivineMC start
      implementation("org.yaml:snakeyaml:2.3")
-@@ -262,14 +_,14 @@
+@@ -263,14 +_,14 @@
          val experimental = rootProject.providers.gradleProperty("experimental").get()
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",
@@ -78,7 +78,7 @@
 -            "Brand-Id" to "bxteam:divinemc", // DivineMC
 -            "Brand-Name" to "DivineMC", // DivineMC
 +            "Specification-Vendor" to "BL dev", // BasiclandMC
-+            "Brand-Id" to "basiclandmc:basiclandmc", // BasiclandMC
++            "Brand-Id" to "basicland:basiclandmc", // BasiclandMC
 +            "Brand-Name" to "BasiclandMC", // BasiclandMC
              "Build-Number" to (build ?: ""),
              "Build-Time" to buildTime.toString(),
