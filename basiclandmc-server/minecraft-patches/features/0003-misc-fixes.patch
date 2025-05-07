@@ -17,6 +17,19 @@ index 00a82873d226f113278632a53c0faca420dd67d4..91db646f7def925dd4cd281dfaac9430
          } catch (Exception var2) {
              if (var2 instanceof ClosedChannelException) {
                  LOGGER.info("Connection closed during protocol change");
+diff --git a/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+index b1fd00bed129feb96b998e7e1169fed1e9c3ad22..9b7fe936b3a85c782e051334162222ed943478f8 100644
+--- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -2151,7 +2151,7 @@ public class ServerGamePacketListenerImpl
+     @Override
+     public void handleTeleportToEntityPacket(ServerboundTeleportToEntityPacket packet) {
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.serverLevel());
+-        if (this.player.isSpectator()) {
++        if (this.player.isSpectator() && this.player.getBukkitEntity().hasPermission("spectatetp")) {
+             for (ServerLevel serverLevel : this.server.getAllLevels()) {
+                 Entity entity = packet.getEntity(serverLevel);
+                 if (entity != null) {
 diff --git a/net/minecraft/world/level/Level.java b/net/minecraft/world/level/Level.java
 index 502473920a8dec1fcd3321d863f07c977b3643f2..199e7c8ca9cd860ac9e6e6ab0109a79b7465e3a5 100644
 --- a/net/minecraft/world/level/Level.java
