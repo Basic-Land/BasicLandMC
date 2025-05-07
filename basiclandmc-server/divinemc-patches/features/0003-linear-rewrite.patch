@@ -5,7 +5,7 @@ Subject: [PATCH] linear-rewrite
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/DivineConfig.java b/src/main/java/org/bxteam/divinemc/DivineConfig.java
-index d4ad79c9062267bf5a1573a76a38474930a93f34..91ee6902a27c113397938a89deb87010d7c70910 100644
+index 2cbe505c7c2c22565418ff2ae274b5e39e9b8ea3..71fab6b01916d3fe927ba61392ed00febd7be8fd 100644
 --- a/src/main/java/org/bxteam/divinemc/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/DivineConfig.java
 @@ -10,7 +10,6 @@ import org.apache.logging.log4j.Logger;
@@ -16,7 +16,7 @@ index d4ad79c9062267bf5a1573a76a38474930a93f34..91ee6902a27c113397938a89deb87010
  import org.bxteam.divinemc.server.chunk.ChunkSystemAlgorithms;
  import org.bxteam.divinemc.server.chunk.ChunkTaskPriority;
  import org.jetbrains.annotations.Nullable;
-@@ -528,7 +527,6 @@ public class DivineConfig {
+@@ -535,7 +534,6 @@ public class DivineConfig {
      }
  
      public static RegionFileFormat regionFormatTypeName = RegionFileFormat.ANVIL;
@@ -24,7 +24,7 @@ index d4ad79c9062267bf5a1573a76a38474930a93f34..91ee6902a27c113397938a89deb87010
      public static int linearFlushMaxThreads = 4;
      public static int linearFlushDelay = 100;
      public static boolean linearUseVirtualThread = false;
-@@ -539,12 +537,6 @@ public class DivineConfig {
+@@ -546,12 +544,6 @@ public class DivineConfig {
              "Valid values:",
              " - LINEAR: Linear region file format",
              " - ANVIL: Anvil region file format (default)"));

@@ -1,0 +1,153 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <pirkldan28@gmail.com>
+Date: Wed, 7 May 2025 19:19:08 +0200
+Subject: [PATCH] test
+
+
+diff --git a/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/ChunkEntitySlices.java b/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/ChunkEntitySlices.java
+index d21ce54ebb5724c04eadf56a2cde701d5eeb5db2..0454357b89324d90ffedde2137a09639965b1121 100644
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/ChunkEntitySlices.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/ChunkEntitySlices.java
+@@ -6,6 +6,7 @@ import ca.spottedleaf.moonrise.patches.chunk_system.level.chunk.ChunkData;
+ import ca.spottedleaf.moonrise.patches.chunk_system.entity.ChunkSystemEntity;
+ import com.google.common.collect.ImmutableList;
+ import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
++import it.unimi.dsi.fastutil.objects.Reference2ObjectMaps;
+ import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+ import net.minecraft.nbt.CompoundTag;
+ import net.minecraft.nbt.ListTag;
+@@ -40,8 +41,8 @@ public final class ChunkEntitySlices {
+ 
+     private final EntityCollectionBySection allEntities;
+     private final EntityCollectionBySection hardCollidingEntities;
+-    private final Reference2ObjectOpenHashMap<Class<? extends Entity>, EntityCollectionBySection> entitiesByClass;
+-    private final Reference2ObjectOpenHashMap<EntityType<?>, EntityCollectionBySection> entitiesByType;
++    private final Reference2ObjectMap<Class<? extends Entity>, EntityCollectionBySection> entitiesByClass;
++    private final Reference2ObjectMap<EntityType<?>, EntityCollectionBySection> entitiesByType;
+     private final EntityList entities = new EntityList();
+ 
+     public FullChunkStatus status;
+@@ -67,8 +68,8 @@ public final class ChunkEntitySlices {
+ 
+         this.allEntities = new EntityCollectionBySection(this);
+         this.hardCollidingEntities = new EntityCollectionBySection(this);
+-        this.entitiesByClass = new Reference2ObjectOpenHashMap<>();
+-        this.entitiesByType = new Reference2ObjectOpenHashMap<>();
++        this.entitiesByClass = Reference2ObjectMaps.synchronize(new Reference2ObjectOpenHashMap<>());
++        this.entitiesByType = Reference2ObjectMaps.synchronize(new Reference2ObjectOpenHashMap<>());
+ 
+         this.status = status;
+         this.chunkData = chunkData;
+@@ -249,7 +250,7 @@ public final class ChunkEntitySlices {
+         }
+ 
+         for (final Iterator<Reference2ObjectMap.Entry<Class<? extends Entity>, EntityCollectionBySection>> iterator =
+-             this.entitiesByClass.reference2ObjectEntrySet().fastIterator(); iterator.hasNext();) {
++             Reference2ObjectMaps.fastIterator(this.entitiesByClass); iterator.hasNext();) {
+             final Reference2ObjectMap.Entry<Class<? extends Entity>, EntityCollectionBySection> entry = iterator.next();
+ 
+             if (entry.getKey().isInstance(entity)) {
+@@ -283,7 +284,7 @@ public final class ChunkEntitySlices {
+         }
+ 
+         for (final Iterator<Reference2ObjectMap.Entry<Class<? extends Entity>, EntityCollectionBySection>> iterator =
+-             this.entitiesByClass.reference2ObjectEntrySet().fastIterator(); iterator.hasNext();) {
++             Reference2ObjectMaps.fastIterator(this.entitiesByClass); iterator.hasNext();) {
+             final Reference2ObjectMap.Entry<Class<? extends Entity>, EntityCollectionBySection> entry = iterator.next();
+ 
+             if (entry.getKey().isInstance(entity)) {
+diff --git a/net/minecraft/server/level/ServerLevel.java b/net/minecraft/server/level/ServerLevel.java
+index 23fc3a8e12fdfcb09fbcfb9f0bb3b15ef17dd4e4..29cf8030360ab1fe642feb39a4253c2072a0d21f 100644
+--- a/net/minecraft/server/level/ServerLevel.java
++++ b/net/minecraft/server/level/ServerLevel.java
+@@ -818,7 +818,7 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+ 
+             io.papermc.paper.entity.activation.ActivationRange.activateEntities(this); // Paper - EAR
+             this.entityTickList
+-                .forEach(
++                .forEachParallel(
+                     entity -> {
+                         entity.activatedPriorityReset = false; // DivineMC - Dynamic Activation of Brain
+                         if (!entity.isRemoved()) {
+diff --git a/net/minecraft/world/level/entity/EntityTickList.java b/net/minecraft/world/level/entity/EntityTickList.java
+index 8c1de4654a3a29e75716a03efd476b8a3b7fe9e9..7b559456774367ac9f73939238253ac6565c1a72 100644
+--- a/net/minecraft/world/level/entity/EntityTickList.java
++++ b/net/minecraft/world/level/entity/EntityTickList.java
+@@ -1,15 +1,20 @@
+ package net.minecraft.world.level.entity;
+ 
+-import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
+-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+-import it.unimi.dsi.fastutil.ints.Int2ObjectMaps;
+-import it.unimi.dsi.fastutil.ints.Int2ObjectMap.Entry;
+-import java.util.function.Consumer;
+-import javax.annotation.Nullable;
++import net.minecraft.server.level.ServerPlayer;
+ import net.minecraft.world.entity.Entity;
+ 
++import java.util.concurrent.Executor;
++import java.util.function.Consumer;
++
+ public class EntityTickList {
+     public final java.util.concurrent.ConcurrentLinkedQueue<Entity> entities = new java.util.concurrent.ConcurrentLinkedQueue<>(); // Paper - rewrite chunk system // DivineMC - Async mob spawning
++    public static final Executor EXECUTOR = java.util.concurrent.Executors.newFixedThreadPool(
++        org.bxteam.divinemc.DivineConfig.regionizedChunkTickingExecutorThreadCount,
++        new org.bxteam.divinemc.util.NamedAgnosticThreadFactory<>("entity_ticking", ca.spottedleaf.moonrise.common.util.TickThread::new,
++            org.bxteam.divinemc.DivineConfig.regionizedChunkTickingExecutorThreadPriority)
++    );
++
++
+     // DivineMC start - Parallel world ticking
+     private final net.minecraft.server.level.ServerLevel serverLevel;
+ 
+@@ -53,4 +58,50 @@ public class EntityTickList {
+         }
+         // Paper end - rewrite chunk system
+     }
++
++    public void forEachParallel(final Consumer<Entity> entity) {
++        if (org.bxteam.divinemc.DivineConfig.enableParallelWorldTicking) ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(serverLevel, "Asynchronous entity ticklist iteration"); // DivineMC - Parallel world ticking
++        // Paper start - rewrite chunk system
++        // To ensure nothing weird happens with dimension travelling, do not iterate over new entries...
++        // (by dfl iterator() is configured to not iterate over new entries)
++        final int size = entities.size();
++        final java.util.Iterator<Entity> iterator = this.entities.iterator(); // DivineMC - Async mob spawning
++        // Paper end - rewrite chunk system
++
++        final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(size);
++
++        try {
++            java.util.concurrent.ForkJoinPool.managedBlock(new java.util.concurrent.ForkJoinPool.ManagedBlocker() {
++                @Override
++                public boolean block() throws InterruptedException {
++                    while (iterator.hasNext()) {
++                        final Entity e = iterator.next();
++                        if (e instanceof ServerPlayer) {
++                            entity.accept(e);
++                            latch.countDown();
++                            continue;
++                        }
++
++                        EXECUTOR.execute(() -> {
++                            try {
++                                entity.accept(e);
++                            } finally {
++                                latch.countDown();
++                            }
++                        });
++                    }
++
++                    latch.await();
++                    return true;
++                }
++
++                @Override
++                public boolean isReleasable() {
++                    return latch.getCount() == 0;
++                }
++            });
++        } catch (InterruptedException ex) {
++            throw new RuntimeException("Interrupted managed block during region ticking", ex);
++        }
++    }
+ }
