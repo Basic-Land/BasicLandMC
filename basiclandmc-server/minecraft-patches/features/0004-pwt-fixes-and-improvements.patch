@@ -1,11 +1,11 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: dan28000 <pirkldan28@gmail.com>
 Date: Tue, 6 May 2025 13:28:19 +0200
-Subject: [PATCH] pwt-improvments
+Subject: [PATCH] pwt-fixes-and-improvements
 
 
 diff --git a/net/minecraft/server/level/ServerChunkCache.java b/net/minecraft/server/level/ServerChunkCache.java
-index a2bb32b964d08079456d93d49f12b23f7c17a7db..bab2d6ce43d31d78ff376d3901c989db2e85a445 100644
+index a2bb32b964d08079456d93d49f12b23f7c17a7db..62f4d6021aa3abcb563dff5de2e2b1f30d72c986 100644
 --- a/net/minecraft/server/level/ServerChunkCache.java
 +++ b/net/minecraft/server/level/ServerChunkCache.java
 @@ -56,7 +56,6 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
@@ -16,34 +16,36 @@ index a2bb32b964d08079456d93d49f12b23f7c17a7db..bab2d6ce43d31d78ff376d3901c989db
      // DivineMC end - Regionized Chunk Ticking
      public final Thread mainThread;
      final ThreadedLevelLightEngine lightEngine;
-@@ -71,7 +70,7 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+@@ -70,8 +69,8 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+     private final long[] lastChunkPos = new long[4];
      private final ChunkStatus[] lastChunkStatus = new ChunkStatus[4];
      private final ChunkAccess[] lastChunk = new ChunkAccess[4];
-     private final List<LevelChunk> tickingChunks = new ArrayList<>();
+-    private final List<LevelChunk> tickingChunks = new ArrayList<>();
 -    private final Set<ChunkHolder> chunkHoldersToBroadcast = new ReferenceOpenHashSet<>();
-+    private final Set<ChunkHolder> chunkHoldersToBroadcast = java.util.Collections.synchronizedSet(new ReferenceOpenHashSet<>());
++    private final it.unimi.dsi.fastutil.objects.ObjectArrayList<LevelChunk> tickingChunks = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(); // BasicLandMC - use fastutil
++    private final Set<ChunkHolder> chunkHoldersToBroadcast = java.util.Collections.synchronizedSet(new ReferenceOpenHashSet<>()); // BasicLandMC - fix concurrency issues
      @Nullable
      @VisibleForDebug
      private NaturalSpawner.SpawnState lastSpawnState;
-@@ -474,38 +473,63 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+@@ -473,23 +472,26 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+     private static final int[] DX = {1, -1, 0, 0, 1, -1, -1, 1};
      private static final int[] DZ = {0, 0, 1, -1, 1, 1, -1, -1};
  
++    // BasicLandMC - Rewrite of the original method start
      private List<LevelChunk>[] splitChunksIntoRegions(List<LevelChunk> chunks) {
+-        int size = chunks.size();
+-        java.util.IdentityHashMap<LevelChunk, Boolean> chunkSet = new java.util.IdentityHashMap<>(size);
+-
+-        for (LevelChunk chunk : chunks) {
+-            chunkSet.put(chunk, Boolean.TRUE);
 +        if (chunks.isEmpty()) {
 +            return new List[0];
-+        }
-+
-         int size = chunks.size();
--        java.util.IdentityHashMap<LevelChunk, Boolean> chunkSet = new java.util.IdentityHashMap<>(size);
-+        // Use FastUtil for better performance
-+        it.unimi.dsi.fastutil.objects.Object2BooleanOpenHashMap<LevelChunk> chunkSet = new it.unimi.dsi.fastutil.objects.Object2BooleanOpenHashMap<>(size);
- 
-         for (LevelChunk chunk : chunks) {
--            chunkSet.put(chunk, Boolean.TRUE);
-+            chunkSet.put(chunk, true);
          }
  
 -        List<List<LevelChunk>> groups = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(size >> 3);
++        int size = chunks.size();
++        it.unimi.dsi.fastutil.objects.ObjectOpenHashSet<LevelChunk> chunkSet = new it.unimi.dsi.fastutil.objects.ObjectOpenHashSet<>(chunks);
++
 +        List<List<LevelChunk>> groups = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(Math.max(1, size / 16));
          LevelChunk[] stack = new LevelChunk[size];
 -        int stackPointer = 0;
@@ -51,35 +53,24 @@ index a2bb32b964d08079456d93d49f12b23f7c17a7db..bab2d6ce43d31d78ff376d3901c989db
  
          for (LevelChunk chunk : chunks) {
 -            if (chunkSet.remove(chunk) == null) continue;
-+            if (!chunkSet.containsKey(chunk)) continue;
++            if (!chunkSet.contains(chunk)) continue;
  
 -            List<LevelChunk> group = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(64);
 -            stack[stackPointer++] = chunk;
-+            // Use FastUtil's array list for better performance
 +            it.unimi.dsi.fastutil.objects.ObjectArrayList<LevelChunk> group = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(64);
 +            stack[0] = chunk;
 +            stackPointer = 1;
-+            chunkSet.removeBoolean(chunk);
++            chunkSet.remove(chunk);
  
              while (stackPointer > 0) {
                  LevelChunk current = stack[--stackPointer];
-                 group.add(current);
+@@ -497,17 +499,24 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
  
--                for (int i = 0; i < 8; i++) {
-+                // Check direct neighbors first (cardinal directions)
-+                for (int i = 0; i < 4; i++) {
-+                    LevelChunk neighbor = getChunk(current.locX + DX[i], current.locZ + DZ[i], false);
-+                    if (neighbor != null && chunkSet.removeBoolean(neighbor)) {
-+                        stack[stackPointer++] = neighbor;
-+                    }
-+                }
-+
-+                // Then check diagonal neighbors
-+                for (int i = 4; i < 8; i++) {
+                 for (int i = 0; i < 8; i++) {
                      LevelChunk neighbor = getChunk(current.locX + DX[i], current.locZ + DZ[i], false);
 -                    if (neighbor == null || chunkSet.remove(neighbor) == null) continue;
 -                    stack[stackPointer++] = neighbor;
-+                    if (neighbor != null && chunkSet.removeBoolean(neighbor)) {
++                    if (neighbor != null && chunkSet.remove(neighbor)) {
 +                        stack[stackPointer++] = neighbor;
 +                    }
                  }
@@ -87,7 +78,6 @@ index a2bb32b964d08079456d93d49f12b23f7c17a7db..bab2d6ce43d31d78ff376d3901c989db
  
              groups.add(group);
 +
-+            // Early exit if all chunks are processed
 +            if (chunkSet.isEmpty()) {
 +                break;
 +            }
@@ -98,11 +88,16 @@ index a2bb32b964d08079456d93d49f12b23f7c17a7db..bab2d6ce43d31d78ff376d3901c989db
 +        List<LevelChunk>[] result = new List[groups.size()];
 +        return groups.toArray(result);
      }
-     // DivineMC end - Regionized Chunk Ticking
+-    // DivineMC end - Regionized Chunk Ticking
++    // DivineMC end - Regionized Chunk Ticking // BasicLandMC - Rewrite of the original method end
  
-@@ -527,75 +551,56 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+     @Override
+     public void tick(BooleanSupplier hasTimeLeft, boolean tickChunks) {
+@@ -526,76 +535,58 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+         this.clearCache();
      }
  
++    // BasicLandMC - Small rewrite and fix for stopping ticking start
      private void tickChunks() {
 -        long gameTime = this.level.getGameTime();
 -        long l = gameTime - this.lastInhabitedUpdate;
@@ -171,7 +166,7 @@ index a2bb32b964d08079456d93d49f12b23f7c17a7db..bab2d6ce43d31d78ff376d3901c989db
 +            return;
          }
  
-+        final List<LevelChunk> list = this.tickingChunks;
++        final it.unimi.dsi.fastutil.objects.ObjectArrayList<LevelChunk> list = this.tickingChunks;
 +
 +        try {
 +            this.collectTickingChunks(list);
@@ -190,7 +185,7 @@ index a2bb32b964d08079456d93d49f12b23f7c17a7db..bab2d6ce43d31d78ff376d3901c989db
 +
 +            // DivineMC start - Regionized Chunk Ticking
 +            if (org.bxteam.divinemc.DivineConfig.enableRegionizedChunkTicking) {
-+                this.processChunksRegionized(l, list);
++                this.processChunksRegionized(l, list); // BasicLandMC - Move regionized chunk ticking to its own method
 +            } else {
 +                this.tickChunks(l, list);
 +            }
@@ -215,7 +210,7 @@ index a2bb32b964d08079456d93d49f12b23f7c17a7db..bab2d6ce43d31d78ff376d3901c989db
                      player.mobBackoffCounts[ii] = newBackoff;
                  }
              }
-@@ -607,24 +612,75 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+@@ -607,24 +598,76 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
                  MinecraftServer.getServer().mobSpawnExecutor.submit(() -> {
                      int mapped = distanceManager.getNaturalSpawnChunkCount();
                      try {
@@ -236,8 +231,10 @@ index a2bb32b964d08079456d93d49f12b23f7c17a7db..bab2d6ce43d31d78ff376d3901c989db
              }
          }
          // DivineMC end - Async mob spawning
-     }
- 
+-    }
++    } // BasicLandMC - Small rewrite and fix for stopping ticking end
++
++    // BasicLandMC - Move regionized chunk ticking to its own method start
 +    private void processChunksRegionized(final long timeDelta, final List<LevelChunk> chunks) {
 +        final List<LevelChunk>[] regions = splitChunksIntoRegions(chunks);
 +        final int regionCount = regions.length;
@@ -279,14 +276,14 @@ index a2bb32b964d08079456d93d49f12b23f7c17a7db..bab2d6ce43d31d78ff376d3901c989db
 +        } catch (InterruptedException ex) {
 +            throw new RuntimeException("Interrupted managed block during region ticking", ex);
 +        }
-+    }
-+
++    } // BasicLandMC - Move regionized chunk ticking to its own method end
+ 
      private void broadcastChangedChunks() {
 -        for (ChunkHolder chunkHolder : this.chunkHoldersToBroadcast) {
 -            LevelChunk tickingChunk = chunkHolder.getChunkToSend(); // Paper - rewrite chunk system
 -            if (tickingChunk != null) {
 -                chunkHolder.broadcastChanges(tickingChunk);
-+        synchronized (chunkHoldersToBroadcast) {
++        synchronized (chunkHoldersToBroadcast) { // BasicLandMC - fix concurrency issues
 +            for (ChunkHolder chunkHolder : this.chunkHoldersToBroadcast) {
 +                LevelChunk tickingChunk = chunkHolder.getChunkToSend(); // Paper - rewrite chunk system
 +                if (tickingChunk != null) {
@@ -300,49 +297,114 @@ index a2bb32b964d08079456d93d49f12b23f7c17a7db..bab2d6ce43d31d78ff376d3901c989db
      }
  
      private void collectTickingChunks(List<LevelChunk> output) {
+diff --git a/net/minecraft/server/level/ServerLevel.java b/net/minecraft/server/level/ServerLevel.java
+index bea62fca118efdd6257188cd53c813dc5fd0c19c..5a25df1e002b3674bf811442f924fbe8ba5a1dae 100644
+--- a/net/minecraft/server/level/ServerLevel.java
++++ b/net/minecraft/server/level/ServerLevel.java
+@@ -193,7 +193,7 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+     private final LevelTicks<Block> blockTicks = new LevelTicks<>(this::isPositionTickingWithEntitiesLoaded);
+     private final LevelTicks<Fluid> fluidTicks = new LevelTicks<>(this::isPositionTickingWithEntitiesLoaded);
+     private final PathTypeCache pathTypesByPosCache = new PathTypeCache();
+-    final Set<Mob> navigatingMobs = new ObjectOpenHashSet<>();
++    final Set<Mob> navigatingMobs = java.util.Collections.synchronizedSet(new ObjectOpenHashSet<>()); // BasicLandMC - fix Concurrency issues
+     volatile boolean isUpdatingNavigations;
+     protected final Raids raids;
+     private final ObjectLinkedOpenHashSet<BlockEventData> blockEvents = new ObjectLinkedOpenHashSet<>();
+@@ -1794,22 +1794,14 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+         if (Shapes.joinIsNotEmpty(collisionShape, collisionShape1, BooleanOp.NOT_SAME)) {
+             List<PathNavigation> list = new ObjectArrayList<>();
+ 
+-            try { // Paper - catch CME see below why
++            synchronized (this.navigatingMobs) { // BasiclandMC - fix concurrent modification start
+             for (Mob mob : this.navigatingMobs) {
+                 PathNavigation navigation = mob.getNavigation();
+                 if (navigation.shouldRecomputePath(pos)) {
+                     list.add(navigation);
+                 }
+             }
+-            // Paper start - catch CME see below why
+-            } catch (final java.util.ConcurrentModificationException concurrentModificationException) {
+-                // This can happen because the pathfinder update below may trigger a chunk load, which in turn may cause more navigators to register
+-                // In this case we just run the update again across all the iterators as the chunk will then be loaded
+-                // As this is a relative edge case it is much faster than copying navigators (on either read or write)
+-                this.sendBlockUpdated(pos, oldState, newState, flags);
+-                return;
+-            }
+-            // Paper end - catch CME see below why
++            } // BasiclandMC - fix concurrent modification end
+ 
+             try {
+                 this.isUpdatingNavigations = true;
+diff --git a/net/minecraft/world/level/Level.java b/net/minecraft/world/level/Level.java
+index 502473920a8dec1fcd3321d863f07c977b3643f2..c02165fc9ff4f78ba919f80fe2a166092b1184ab 100644
+--- a/net/minecraft/world/level/Level.java
++++ b/net/minecraft/world/level/Level.java
+@@ -115,7 +115,7 @@ public abstract class Level implements LevelAccessor, AutoCloseable, ca.spottedl
+     public static final int MIN_ENTITY_SPAWN_Y = -20000000;
+     public final org.bxteam.divinemc.util.BlockEntityTickersList blockEntityTickers = new org.bxteam.divinemc.util.BlockEntityTickersList(); // Paper - public // DivineMC - optimize block entity removals - Fix MC-117075
+     protected final NeighborUpdater neighborUpdater;
+-    private final List<TickingBlockEntity> pendingBlockEntityTickers = Lists.newArrayList();
++    private final List<TickingBlockEntity> pendingBlockEntityTickers = java.util.Collections.synchronizedList(Lists.newArrayList()); // BasiclandMC fix concurrency issues
+     private boolean tickingBlockEntities;
+     public final Thread thread;
+     private final boolean isDebug;
+diff --git a/net/minecraft/world/level/block/SaplingBlock.java b/net/minecraft/world/level/block/SaplingBlock.java
+index 4ad0e278a348407beed1ec4381bfeacf4de32a0d..6402651e613c2376c2315d2b3dd55a707810f684 100644
+--- a/net/minecraft/world/level/block/SaplingBlock.java
++++ b/net/minecraft/world/level/block/SaplingBlock.java
+@@ -71,6 +71,7 @@ public class SaplingBlock extends BushBlock implements BonemealableBlock {
+         }
+     }
+ 
++    // BasiclandMC fix errors from PWT
+     public void advanceTree(ServerLevel level, BlockPos pos, BlockState state, RandomSource random) {
+         if (state.getValue(STAGE) == 0) {
+             level.setBlock(pos, state.cycle(STAGE), 4);
+@@ -83,19 +84,27 @@ public class SaplingBlock extends BushBlock implements BonemealableBlock {
+                 this.treeGrower.growTree(level, level.getChunkSource().getGenerator(), pos, state, random);
+                 level.captureTreeGeneration = false;
+                 if (!level.capturedBlockStates.isEmpty()) {
++                    java.util.List<org.bukkit.block.BlockState> blocks = new java.util.ArrayList<>(level.capturedBlockStates.values());
++                    level.capturedBlockStates.clear();
+                     // DivineMC start - Parallel world ticking
+                     org.bukkit.TreeType treeTypeLocal = SaplingBlock.getTreeTypeTL();
+                     SaplingBlock.setTreeTypeTL(null);
+                     // DivineMC end - Parallel world ticking
+                     org.bukkit.Location location = org.bukkit.craftbukkit.util.CraftLocation.toBukkit(pos, level.getWorld());
+-                    java.util.List<org.bukkit.block.BlockState> blocks = new java.util.ArrayList<>(level.capturedBlockStates.values());
+-                    level.capturedBlockStates.clear();
+-                    org.bukkit.event.world.StructureGrowEvent event = null;
+-                    if (treeTypeLocal != null) { // DivineMC - Parallel world ticking
+-                        event = new org.bukkit.event.world.StructureGrowEvent(location, treeTypeLocal, false, null, blocks); // DivineMC - Parallel world ticking
++
++                    // Only proceed with event if we have a valid tree type
++                    if (treeTypeLocal != null) {
++                        org.bukkit.event.world.StructureGrowEvent event = new org.bukkit.event.world.StructureGrowEvent(location, treeTypeLocal, false, null, blocks);
+                         org.bukkit.Bukkit.getPluginManager().callEvent(event);
+-                    }
+-                    if (event == null || !event.isCancelled()) {
++
++                        if (!event.isCancelled()) {
++                            for (org.bukkit.block.BlockState blockstate : blocks) {
++                                org.bukkit.craftbukkit.block.CapturedBlockState.setBlockState(blockstate);
++                                level.checkCapturedTreeStateForObserverNotify(pos, (org.bukkit.craftbukkit.block.CraftBlockState) blockstate);
++                            }
++                        }
++                    } else {
++                        // If no tree type is set, still place the blocks without firing event
+                         for (org.bukkit.block.BlockState blockstate : blocks) {
+                             org.bukkit.craftbukkit.block.CapturedBlockState.setBlockState(blockstate);
+                             level.checkCapturedTreeStateForObserverNotify(pos, (org.bukkit.craftbukkit.block.CraftBlockState) blockstate); // Paper - notify observers even if grow failed
 diff --git a/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java b/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java
-index 028eae2f9a459b60e92f3344091083aa93b54485..c07fa0feeb9e186ef63bc97210309f0f8af6a6cf 100644
+index 028eae2f9a459b60e92f3344091083aa93b54485..4d1ab40c4a115cd7f449732441c2fb471c8f5011 100644
 --- a/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java
 +++ b/net/minecraft/world/level/redstone/CollectingNeighborUpdater.java
-@@ -17,8 +17,8 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
-     private static final Logger LOGGER = LogUtils.getLogger();
-     private final Level level;
-     private final int maxChainedNeighborUpdates;
--    private final ArrayDeque<CollectingNeighborUpdater.NeighborUpdates> stack = new ArrayDeque<>();
--    private final List<CollectingNeighborUpdater.NeighborUpdates> addedThisLayer = new ArrayList<>();
-+    private final ArrayDeque<NeighborUpdates> stack = new ArrayDeque<>();
-+    private final List<NeighborUpdates> addedThisLayer = new ArrayList<>();
-     private int count = 0;
- 
-     public CollectingNeighborUpdater(Level level, int maxChainedNeighborUpdates) {
-@@ -28,25 +28,25 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
- 
-     @Override
-     public void shapeUpdate(Direction direction, BlockState state, BlockPos pos, BlockPos neighborPos, int flags, int recursionLevel) {
--        this.addAndRun(pos, new CollectingNeighborUpdater.ShapeUpdate(direction, state, pos.immutable(), neighborPos.immutable(), flags, recursionLevel));
-+        this.addAndRun(pos, new ShapeUpdate(direction, state, pos.immutable(), neighborPos.immutable(), flags, recursionLevel));
-     }
- 
-     @Override
-     public void neighborChanged(BlockPos pos, Block neighborBlock, @Nullable Orientation orientation) {
--        this.addAndRun(pos, new CollectingNeighborUpdater.SimpleNeighborUpdate(pos, neighborBlock, orientation));
-+        this.addAndRun(pos, new SimpleNeighborUpdate(pos, neighborBlock, orientation));
-     }
- 
-     @Override
-     public void neighborChanged(BlockState state, BlockPos pos, Block neighborBlock, @Nullable Orientation orientation, boolean movedByPiston) {
--        this.addAndRun(pos, new CollectingNeighborUpdater.FullNeighborUpdate(state, pos.immutable(), neighborBlock, orientation, movedByPiston));
-+        this.addAndRun(pos, new FullNeighborUpdate(state, pos.immutable(), neighborBlock, orientation, movedByPiston));
-     }
- 
-     @Override
-     public void updateNeighborsAtExceptFromFacing(BlockPos pos, Block block, @Nullable Direction facing, @Nullable Orientation orientation) {
--        this.addAndRun(pos, new CollectingNeighborUpdater.MultiNeighborUpdate(pos.immutable(), block, orientation, facing));
-+        this.addAndRun(pos, new MultiNeighborUpdate(pos.immutable(), block, orientation, facing));
+@@ -46,7 +46,7 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
+         this.addAndRun(pos, new CollectingNeighborUpdater.MultiNeighborUpdate(pos.immutable(), block, orientation, facing));
      }
  
 -    private void addAndRun(BlockPos pos, CollectingNeighborUpdater.NeighborUpdates updates) {
-+    private synchronized void addAndRun(BlockPos pos, NeighborUpdates updates) {
++    private synchronized void addAndRun(BlockPos pos, CollectingNeighborUpdater.NeighborUpdates updates) { // BasicLandMC - synchronized
          boolean flag = this.count > 0;
          boolean flag1 = this.maxChainedNeighborUpdates >= 0 && this.count >= this.maxChainedNeighborUpdates;
          this.count++;
@@ -351,52 +413,7 @@ index 028eae2f9a459b60e92f3344091083aa93b54485..c07fa0feeb9e186ef63bc97210309f0f
      }
  
 -    private void runUpdates() {
-+    private synchronized void runUpdates() {
++    private synchronized void runUpdates() { // BasicLandMC - synchronized
          try {
              while (!this.stack.isEmpty() || !this.addedThisLayer.isEmpty()) {
                  for (int i = this.addedThisLayer.size() - 1; i >= 0; i--) {
-@@ -73,7 +73,7 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
-                 }
- 
-                 this.addedThisLayer.clear();
--                CollectingNeighborUpdater.NeighborUpdates neighborUpdates = this.stack.peek();
-+                NeighborUpdates neighborUpdates = this.stack.peek();
- 
-                 while (this.addedThisLayer.isEmpty()) {
-                     if (!neighborUpdates.runNext(this.level)) {
-@@ -90,7 +90,7 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
-     }
- 
-     record FullNeighborUpdate(BlockState state, BlockPos pos, Block block, @Nullable Orientation orientation, boolean movedByPiston)
--        implements CollectingNeighborUpdater.NeighborUpdates {
-+        implements NeighborUpdates {
-         @Override
-         public boolean runNext(Level level) {
-             NeighborUpdater.executeUpdate(level, this.state, this.pos, this.block, this.orientation, this.movedByPiston);
-@@ -98,7 +98,7 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
-         }
-     }
- 
--    static final class MultiNeighborUpdate implements CollectingNeighborUpdater.NeighborUpdates {
-+    static final class MultiNeighborUpdate implements NeighborUpdates {
-         private final BlockPos sourcePos;
-         private final Block sourceBlock;
-         @Nullable
-@@ -147,7 +147,7 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
-     }
- 
-     record ShapeUpdate(Direction direction, BlockState neighborState, BlockPos pos, BlockPos neighborPos, int updateFlags, int updateLimit)
--        implements CollectingNeighborUpdater.NeighborUpdates {
-+        implements NeighborUpdates {
-         @Override
-         public boolean runNext(Level level) {
-             NeighborUpdater.executeShapeUpdate(level, this.direction, this.pos, this.neighborPos, this.neighborState, this.updateFlags, this.updateLimit);
-@@ -155,7 +155,7 @@ public class CollectingNeighborUpdater implements NeighborUpdater {
-         }
-     }
- 
--    record SimpleNeighborUpdate(BlockPos pos, Block block, @Nullable Orientation orientation) implements CollectingNeighborUpdater.NeighborUpdates {
-+    record SimpleNeighborUpdate(BlockPos pos, Block block, @Nullable Orientation orientation) implements NeighborUpdates {
-         @Override
-         public boolean runNext(Level level) {
-             BlockState blockState = level.getBlockState(this.pos);

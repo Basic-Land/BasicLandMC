@@ -5,7 +5,7 @@ Subject: [PATCH] misc-fixes
 
 
 diff --git a/net/minecraft/network/Connection.java b/net/minecraft/network/Connection.java
-index 00a82873d226f113278632a53c0faca420dd67d4..91db646f7def925dd4cd281dfaac94302eec8d38 100644
+index 00a82873d226f113278632a53c0faca420dd67d4..296c3affa7706b3026d25d477ab6e33e61d970d7 100644
 --- a/net/minecraft/network/Connection.java
 +++ b/net/minecraft/network/Connection.java
 @@ -325,7 +325,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
@@ -13,49 +13,12 @@ index 00a82873d226f113278632a53c0faca420dd67d4..91db646f7def925dd4cd281dfaac9430
      private static void syncAfterConfigurationChange(ChannelFuture future) {
          try {
 -            future.syncUninterruptibly();
-+            future.awaitUninterruptibly(5000L);
++            future.awaitUninterruptibly(5000L); // BasiclandMC - 5 second timeout to mitigate deadlocks
          } catch (Exception var2) {
              if (var2 instanceof ClosedChannelException) {
                  LOGGER.info("Connection closed during protocol change");
-diff --git a/net/minecraft/server/level/ServerLevel.java b/net/minecraft/server/level/ServerLevel.java
-index bea62fca118efdd6257188cd53c813dc5fd0c19c..23fc3a8e12fdfcb09fbcfb9f0bb3b15ef17dd4e4 100644
---- a/net/minecraft/server/level/ServerLevel.java
-+++ b/net/minecraft/server/level/ServerLevel.java
-@@ -193,7 +193,7 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
-     private final LevelTicks<Block> blockTicks = new LevelTicks<>(this::isPositionTickingWithEntitiesLoaded);
-     private final LevelTicks<Fluid> fluidTicks = new LevelTicks<>(this::isPositionTickingWithEntitiesLoaded);
-     private final PathTypeCache pathTypesByPosCache = new PathTypeCache();
--    final Set<Mob> navigatingMobs = new ObjectOpenHashSet<>();
-+    final Set<Mob> navigatingMobs = java.util.Collections.synchronizedSet(new ObjectOpenHashSet<>());
-     volatile boolean isUpdatingNavigations;
-     protected final Raids raids;
-     private final ObjectLinkedOpenHashSet<BlockEventData> blockEvents = new ObjectLinkedOpenHashSet<>();
-@@ -1794,22 +1794,14 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
-         if (Shapes.joinIsNotEmpty(collisionShape, collisionShape1, BooleanOp.NOT_SAME)) {
-             List<PathNavigation> list = new ObjectArrayList<>();
- 
--            try { // Paper - catch CME see below why
-+            synchronized (this.navigatingMobs) {
-             for (Mob mob : this.navigatingMobs) {
-                 PathNavigation navigation = mob.getNavigation();
-                 if (navigation.shouldRecomputePath(pos)) {
-                     list.add(navigation);
-                 }
-             }
--            // Paper start - catch CME see below why
--            } catch (final java.util.ConcurrentModificationException concurrentModificationException) {
--                // This can happen because the pathfinder update below may trigger a chunk load, which in turn may cause more navigators to register
--                // In this case we just run the update again across all the iterators as the chunk will then be loaded
--                // As this is a relative edge case it is much faster than copying navigators (on either read or write)
--                this.sendBlockUpdated(pos, oldState, newState, flags);
--                return;
-             }
--            // Paper end - catch CME see below why
- 
-             try {
-                 this.isUpdatingNavigations = true;
 diff --git a/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-index b1fd00bed129feb96b998e7e1169fed1e9c3ad22..9b7fe936b3a85c782e051334162222ed943478f8 100644
+index b1fd00bed129feb96b998e7e1169fed1e9c3ad22..e10b5e2924124227139cff7dc6675c38905d438f 100644
 --- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 @@ -2151,7 +2151,7 @@ public class ServerGamePacketListenerImpl
@@ -63,20 +26,7 @@ index b1fd00bed129feb96b998e7e1169fed1e9c3ad22..9b7fe936b3a85c782e051334162222ed
      public void handleTeleportToEntityPacket(ServerboundTeleportToEntityPacket packet) {
          PacketUtils.ensureRunningOnSameThread(packet, this, this.player.serverLevel());
 -        if (this.player.isSpectator()) {
-+        if (this.player.isSpectator() && this.player.getBukkitEntity().hasPermission("spectatetp")) {
++        if (this.player.isSpectator() && this.player.getBukkitEntity().hasPermission("spectatetp")) { // BasicLandMC - Add permission check for teleporting in spectator mode
              for (ServerLevel serverLevel : this.server.getAllLevels()) {
                  Entity entity = packet.getEntity(serverLevel);
                  if (entity != null) {
-diff --git a/net/minecraft/world/level/Level.java b/net/minecraft/world/level/Level.java
-index 502473920a8dec1fcd3321d863f07c977b3643f2..199e7c8ca9cd860ac9e6e6ab0109a79b7465e3a5 100644
---- a/net/minecraft/world/level/Level.java
-+++ b/net/minecraft/world/level/Level.java
-@@ -115,7 +115,7 @@ public abstract class Level implements LevelAccessor, AutoCloseable, ca.spottedl
-     public static final int MIN_ENTITY_SPAWN_Y = -20000000;
-     public final org.bxteam.divinemc.util.BlockEntityTickersList blockEntityTickers = new org.bxteam.divinemc.util.BlockEntityTickersList(); // Paper - public // DivineMC - optimize block entity removals - Fix MC-117075
-     protected final NeighborUpdater neighborUpdater;
--    private final List<TickingBlockEntity> pendingBlockEntityTickers = Lists.newArrayList();
-+    private final List<TickingBlockEntity> pendingBlockEntityTickers = java.util.Collections.synchronizedList(Lists.newArrayList());
-     private boolean tickingBlockEntities;
-     public final Thread thread;
-     private final boolean isDebug;
