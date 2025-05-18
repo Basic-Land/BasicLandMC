@@ -1,0 +1,215 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <pirkldan28@gmail.com>
+Date: Sun, 18 May 2025 12:03:26 +0200
+Subject: [PATCH] add-v3-linear-format
+
+
+diff --git a/src/main/java/org/bxteam/divinemc/DivineConfig.java b/src/main/java/org/bxteam/divinemc/DivineConfig.java
+index 2cbe505c7c2c22565418ff2ae274b5e39e9b8ea3..2a2c6ebead4489e80c4d4fabe6c584fcf0851b0c 100644
+--- a/src/main/java/org/bxteam/divinemc/DivineConfig.java
++++ b/src/main/java/org/bxteam/divinemc/DivineConfig.java
+@@ -540,6 +540,7 @@ public class DivineConfig {
+     public static int linearFlushDelay = 100;
+     public static boolean linearUseVirtualThread = false;
+     public static int linearCompressionLevel = 1;
++    public static boolean convertWorldToLinear = false;
+     private static void linearRegionFormat() {
+         regionFormatTypeName = RegionFileFormat.fromName(getString("settings.linear-region-format.type", regionFormatTypeName.name(),
+             "The type of region file format to use for storing chunk data.",
+@@ -550,7 +551,8 @@ public class DivineConfig {
+             "The implementation of the linear region file format to use.",
+             "Valid values:",
+             " - V1: Basic and default linear implementation",
+-            " - V2: Introduces a grid-based compression scheme for better data management and flexibility (default)"));
++            " - V2: Introduces a grid-based compression scheme for better data management and flexibility (default)",
++            " - V3: Removes unused data from V2"));
+ 
+         linearFlushMaxThreads = getInt("settings.linear-region-format.flush-max-threads", linearFlushMaxThreads,
+             "The maximum number of threads to use for flushing linear region files.",
+@@ -561,6 +563,10 @@ public class DivineConfig {
+             "Whether to use virtual threads for flushing.");
+         linearCompressionLevel = getInt("settings.linear-region-format.compression-level", linearCompressionLevel,
+             "The compression level to use for the linear region file format.");
++        convertWorldToLinear = getBoolean("settings.linear-region-format.convert-world-to-linear", convertWorldToLinear,
++            "Whether to convert the world to linear region format on startup.",
++            "WARNING: This will convert the world to linear region format, and it may take a long time to complete.",
++            "Make sure to backup your world before enabling this option.");
+ 
+         setComment("settings.linear-region-format",
+             "The linear region file format is a custom region file format that is designed to be more efficient than the ANVIL format.",
+diff --git a/src/main/java/org/bxteam/divinemc/region/LinearImplementation.java b/src/main/java/org/bxteam/divinemc/region/LinearImplementation.java
+index e5215938c382a5d54a1166e14f17b533301272c7..1de171a24532c7baac52fc48dcb8598abc07f885 100644
+--- a/src/main/java/org/bxteam/divinemc/region/LinearImplementation.java
++++ b/src/main/java/org/bxteam/divinemc/region/LinearImplementation.java
+@@ -2,5 +2,6 @@ package org.bxteam.divinemc.region;
+ 
+ public enum LinearImplementation {
+     V1,
+-    V2
++    V2,
++    V3,
+ }
+diff --git a/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java b/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java
+index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..bca3517181ceeebaff2cc5ae3ea05024c660853f 100644
+--- a/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java
++++ b/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java
+@@ -40,6 +40,7 @@ public class LinearRegionFile implements IRegionFile {
+ 
+     private static final byte V1_VERSION = 2;
+     private static final byte V2_VERSION = 3;
++    private static final byte V3_VERSION = 4;
+ 
+     private byte[][] bucketBuffers;
+     private final byte[][] chunkCompressedBuffers = new byte[1024][];
+@@ -126,12 +127,11 @@ public class LinearRegionFile implements IRegionFile {
+             }
+ 
+             byte version = byteBuffer.get();
+-            if (version == V1_VERSION) {
+-                parseLinearV1(byteBuffer);
+-            } else if (version == V2_VERSION) {
+-                parseLinearV2(byteBuffer);
+-            } else {
+-                throw new RuntimeException("Invalid version: " + version + " file " + regionFilePath);
++            switch (version) {
++                case V1_VERSION -> parseLinearV1(byteBuffer);
++                case V2_VERSION -> parseLinearV2(byteBuffer);
++                case V3_VERSION -> parseLinearV3(byteBuffer);
++                default -> throw new RuntimeException("Invalid version: " + version + " file " + regionFilePath);
+             }
+ 
+             schedulingThread.start();
+@@ -236,6 +236,40 @@ public class LinearRegionFile implements IRegionFile {
+         }
+     }
+ 
++    private void parseLinearV3(ByteBuffer buffer) throws IOException {
++        gridSize = buffer.get();
++        if (!(gridSize == 1 || gridSize == 2 || gridSize == 4 || gridSize == 8 || gridSize == 16 || gridSize == 32)) {
++            throw new RuntimeException("Invalid grid size: " + gridSize + " file " + regionFilePath);
++        }
++        bucketSize = 32 / gridSize;
++
++        int bucketCount = gridSize * gridSize;
++        int[] bucketSizes = new int[bucketCount];
++        long[] bucketHashes = new long[bucketCount];
++
++        for (int i = 0; i < bucketCount; i++) {
++            bucketSizes[i] = buffer.getInt();
++            bucketHashes[i] = buffer.getLong();
++        }
++
++        bucketBuffers = new byte[bucketCount][];
++        for (int i = 0; i < bucketCount; i++) {
++            if (bucketSizes[i] > 0) {
++                bucketBuffers[i] = new byte[bucketSizes[i]];
++                buffer.get(bucketBuffers[i]);
++                long rawHash = LongHashFunction.xx().hashBytes(bucketBuffers[i]);
++                if (rawHash != bucketHashes[i]) {
++                    throw new IOException("Region file hash incorrect " + regionFilePath);
++                }
++            }
++        }
++
++        long footerSuperBlock = buffer.getLong();
++        if (footerSuperBlock != SUPERBLOCK) {
++            throw new IOException("Footer superblock invalid " + regionFilePath);
++        }
++    }
++
+     private synchronized void markToSave() {
+         synchronized (markedToSaveLock) {
+             markedToSave = true;
+@@ -270,10 +304,12 @@ public class LinearRegionFile implements IRegionFile {
+     public synchronized void flush() throws IOException {
+         if (!isMarkedToSave()) return;
+         openRegionFile();
+-        if (linearImpl == LinearImplementation.V1) {
+-            flushLinearV1();
+-        } else if (linearImpl == LinearImplementation.V2) {
+-            flushLinearV2();
++        switch (linearImpl) {
++            case V1 -> flushLinearV1();
++            case V2 -> flushLinearV2();
++            case V3 -> flushLinearV3();
++            case null, default -> {
++            }
+         }
+     }
+ 
+@@ -378,6 +414,38 @@ public class LinearRegionFile implements IRegionFile {
+         Files.move(tempFile.toPath(), regionFilePath, StandardCopyOption.REPLACE_EXISTING);
+     }
+ 
++    private void flushLinearV3() throws IOException {
++        File tempFile = new File(regionFilePath.toString() + ".tmp");
++
++        try (FileOutputStream fos = new FileOutputStream(tempFile);
++             DataOutputStream dataOut = new DataOutputStream(fos)) {
++
++            dataOut.writeLong(SUPERBLOCK);
++            dataOut.writeByte(V3_VERSION);
++            dataOut.writeByte(gridSize);
++
++            byte[][] buckets = buildBuckets();
++
++            int bucketCount = gridSize * gridSize;
++            for (int i = 0; i < bucketCount; i++) {
++                dataOut.writeInt(buckets[i] != null ? buckets[i].length : 0);
++                long bucketHash = buckets[i] != null ? LongHashFunction.xx().hashBytes(buckets[i]) : 0;
++                dataOut.writeLong(bucketHash);
++            }
++            for (int i = 0; i < bucketCount; i++) {
++                if (buckets[i] != null) {
++                    dataOut.write(buckets[i]);
++                }
++            }
++            dataOut.writeLong(SUPERBLOCK);
++
++            dataOut.flush();
++            fos.getFD().sync();
++            fos.getChannel().force(true);
++        }
++        Files.move(tempFile.toPath(), regionFilePath, StandardCopyOption.REPLACE_EXISTING);
++    }
++
+     private void writeNBTFeatures(DataOutputStream dataOut) throws IOException {
+         dataOut.writeByte(0);
+     }
+diff --git a/src/main/java/org/bxteam/divinemc/region/RegionFileFactory.java b/src/main/java/org/bxteam/divinemc/region/RegionFileFactory.java
+index fbcdd68d7e72c2a52112cd3c8c3ab7b774493285..eee646aa74aec07c77fc056437cccd5bd7ad5c34 100644
+--- a/src/main/java/org/bxteam/divinemc/region/RegionFileFactory.java
++++ b/src/main/java/org/bxteam/divinemc/region/RegionFileFactory.java
+@@ -21,14 +21,9 @@ public class RegionFileFactory {
+         final String fullFileName = path.getFileName().toString();
+         final String[] fullNameSplit = fullFileName.split("\\.");
+         final String extensionName = fullNameSplit[fullNameSplit.length - 1];
+-        switch (RegionFileFormat.fromExtension(extensionName)) {
+-            case LINEAR -> {
+-                return new LinearRegionFile(path, DivineConfig.linearImplementation, DivineConfig.linearCompressionLevel);
+-            }
+-
+-            default -> {
+-                return new RegionFile(storageKey, path, directory, compressionFormat, dsync);
+-            }
++        if (RegionFileFormat.fromExtension(extensionName) == RegionFileFormat.LINEAR) {
++            return new LinearRegionFile(path, DivineConfig.linearImplementation, DivineConfig.linearCompressionLevel);
+         }
++        return new RegionFile(storageKey, path, directory, compressionFormat, dsync);
+     }
+ }
+diff --git a/src/main/java/org/bxteam/divinemc/region/RegionFileFormat.java b/src/main/java/org/bxteam/divinemc/region/RegionFileFormat.java
+index 30a54e569c1923d53bc68e8ffbdb0a969a037b6c..3578310b11261a3d25c9c4020b8731fbd8507f19 100644
+--- a/src/main/java/org/bxteam/divinemc/region/RegionFileFormat.java
++++ b/src/main/java/org/bxteam/divinemc/region/RegionFileFormat.java
+@@ -30,9 +30,7 @@ public enum RegionFileFormat {
+                 return LINEAR;
+             }
+ 
+-            default -> {
+-                throw new IllegalArgumentException("Unknown region file format: " + name);
+-            }
++            default -> throw new IllegalArgumentException("Unknown region file format: " + name);
+         }
+     }
+ 
