@@ -65,7 +65,7 @@ paperweight {
     decompileRepo.set(paperMavenPublicUrl)
 
     useStandardUpstream("divinemc") {
-        url.set(github("DivineMC", "DivineMC"))
+        url.set(github("BX-Team", "DivineMC"))
         ref.set(providers.gradleProperty("divineRef"))
 
         withStandardPatcher {
