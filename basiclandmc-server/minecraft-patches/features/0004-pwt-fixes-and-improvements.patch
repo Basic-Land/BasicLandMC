@@ -336,7 +336,7 @@ index bea62fca118efdd6257188cd53c813dc5fd0c19c..5a25df1e002b3674bf811442f924fbe8
              try {
                  this.isUpdatingNavigations = true;
 diff --git a/net/minecraft/world/level/Level.java b/net/minecraft/world/level/Level.java
-index 502473920a8dec1fcd3321d863f07c977b3643f2..c02165fc9ff4f78ba919f80fe2a166092b1184ab 100644
+index 502473920a8dec1fcd3321d863f07c977b3643f2..3032663fee81a22c2890cc2c1a8e902b71dec8fb 100644
 --- a/net/minecraft/world/level/Level.java
 +++ b/net/minecraft/world/level/Level.java
 @@ -115,7 +115,7 @@ public abstract class Level implements LevelAccessor, AutoCloseable, ca.spottedl
@@ -348,6 +348,15 @@ index 502473920a8dec1fcd3321d863f07c977b3643f2..c02165fc9ff4f78ba919f80fe2a16609
      private boolean tickingBlockEntities;
      public final Thread thread;
      private final boolean isDebug;
+@@ -148,7 +148,7 @@ public abstract class Level implements LevelAccessor, AutoCloseable, ca.spottedl
+     public boolean captureBlockStates = false;
+     public boolean captureTreeGeneration = false;
+     public boolean isBlockPlaceCancelled = false; // Paper - prevent calling cleanup logic when undoing a block place upon a cancelled BlockPlaceEvent
+-    public Map<BlockPos, org.bukkit.craftbukkit.block.CraftBlockState> capturedBlockStates = new java.util.LinkedHashMap<>(); // Paper
++    public Map<BlockPos, org.bukkit.craftbukkit.block.CraftBlockState> capturedBlockStates = java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>()); // Paper
+     public Map<BlockPos, BlockEntity> capturedTileEntities = new java.util.LinkedHashMap<>(); // Paper - Retain block place order when capturing blockstates
+     public List<net.minecraft.world.entity.item.ItemEntity> captureDrops;
+     public final it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap<SpawnCategory> ticksPerSpawnCategory = new it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap<>();
 diff --git a/net/minecraft/world/level/block/SaplingBlock.java b/net/minecraft/world/level/block/SaplingBlock.java
 index 4ad0e278a348407beed1ec4381bfeacf4de32a0d..6402651e613c2376c2315d2b3dd55a707810f684 100644
 --- a/net/minecraft/world/level/block/SaplingBlock.java
