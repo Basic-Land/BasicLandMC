@@ -1,4 +1,4 @@
-<img src="./public/logo.png" height="220" alt="DivineMC Face" align="right">
+<img src="/public/logo.png" height="220" alt="DivineMC Face" align="right">
 <div align="center">
 
 # DivineMC
