@@ -5,7 +5,7 @@ Subject: [PATCH] PET
 
 
 diff --git a/net/minecraft/server/level/ServerChunkCache.java b/net/minecraft/server/level/ServerChunkCache.java
-index 62f4d6021aa3abcb563dff5de2e2b1f30d72c986..2bde4247b0239faacc188afdabb7536fab041554 100644
+index 62f4d6021aa3abcb563dff5de2e2b1f30d72c986..1040ae68f7835b9d0143f470aaf3ee3265e47408 100644
 --- a/net/minecraft/server/level/ServerChunkCache.java
 +++ b/net/minecraft/server/level/ServerChunkCache.java
 @@ -473,24 +473,24 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
@@ -130,7 +130,11 @@ index 62f4d6021aa3abcb563dff5de2e2b1f30d72c986..2bde4247b0239faacc188afdabb7536f
          final int regionCount = regions.length;
  
          if (regionCount == 0) {
-@@ -629,7 +671,7 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+@@ -626,10 +668,11 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+         java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(regionCount);
+ 
+         try {
++            io.papermc.paper.entity.activation.ActivationRange.activateEntities(level);
              java.util.concurrent.ForkJoinPool.managedBlock(new java.util.concurrent.ForkJoinPool.ManagedBlocker() {
                  @Override
                  public boolean block() throws InterruptedException {
@@ -139,7 +143,7 @@ index 62f4d6021aa3abcb563dff5de2e2b1f30d72c986..2bde4247b0239faacc188afdabb7536f
                          if (region == null || region.isEmpty()) {
                              latch.countDown();
                              continue;
-@@ -637,12 +679,16 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+@@ -637,12 +680,16 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
  
                          REGION_EXECUTOR.execute(() -> {
                              try {
@@ -158,17 +162,21 @@ index 62f4d6021aa3abcb563dff5de2e2b1f30d72c986..2bde4247b0239faacc188afdabb7536f
                      latch.await();
                      return true;
 diff --git a/net/minecraft/server/level/ServerLevel.java b/net/minecraft/server/level/ServerLevel.java
-index 5a25df1e002b3674bf811442f924fbe8ba5a1dae..3a20c6d6f47f2dddfa2d1ec7b92b283db099464a 100644
+index 5a25df1e002b3674bf811442f924fbe8ba5a1dae..aa2d504ee9bce19b534352f39176a8638f8bae8c 100644
 --- a/net/minecraft/server/level/ServerLevel.java
 +++ b/net/minecraft/server/level/ServerLevel.java
-@@ -817,6 +817,10 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+@@ -816,7 +816,13 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+                 this.dragonFight.tick();
              }
  
-             io.papermc.paper.entity.activation.ActivationRange.activateEntities(this); // Paper - EAR
+-            io.papermc.paper.entity.activation.ActivationRange.activateEntities(this); // Paper - EAR
 +            if (org.bxteam.divinemc.DivineConfig.enableRegionizedChunkTicking) {
 +                this.tickBlockEntities();
 +                return;
 +            }
++
++            io.papermc.paper.entity.activation.ActivationRange.activateEntities(this); // Paper - EAR //BasiclandMC RCT move down
++
              this.entityTickList
                  .forEach(
                      entity -> {
