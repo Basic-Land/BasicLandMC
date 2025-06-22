@@ -1,16 +1,9 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: dan28000 <pirkldan28@gmail.com>
-Date: Thu, 24 Apr 2025 21:03:19 +0200
-Subject: [PATCH] misc-fixes
-
-diff --git a/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-index b1fd00bed129feb96b998e7e1169fed1e9c3ad22..e10b5e2924124227139cff7dc6675c38905d438f 100644
 --- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-@@ -2151,7 +2151,7 @@ public class ServerGamePacketListenerImpl
+@@ -2229,7 +_,7 @@
      @Override
      public void handleTeleportToEntityPacket(ServerboundTeleportToEntityPacket packet) {
-         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.serverLevel());
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
 -        if (this.player.isSpectator()) {
 +        if (this.player.isSpectator() && this.player.getBukkitEntity().hasPermission("spectatetp")) { // BasicLandMC - Add permission check for teleporting in spectator mode
              for (ServerLevel serverLevel : this.server.getAllLevels()) {

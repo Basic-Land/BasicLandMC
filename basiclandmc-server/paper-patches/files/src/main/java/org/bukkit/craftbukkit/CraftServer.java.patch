@@ -1,12 +1,12 @@
 --- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 +++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-@@ -617,7 +_,9 @@
+@@ -619,7 +_,9 @@
  
          for (Plugin plugin : plugins) {
              if ((!plugin.isEnabled()) && (plugin.getDescription().getLoad() == type)) {
-+                long time = System.currentTimeMillis(); // BasiclandMC - Add time measurement
++                long time = System.currentTimeMillis(); // BasicLandMC - Add time measurement
                  this.enablePlugin(plugin);
-+                logger.info("Enabled Plugin '" + plugin.getDescription().getFullName() + "' in " + (System.currentTimeMillis() - time) + " ms"); // BasiclandMC - Add time measurement
++                logger.info("Enabled Plugin '" + plugin.getDescription().getFullName() + "' in " + (System.currentTimeMillis() - time) + " ms"); // BasicLandMC - Add time measurement
              }
          }
  

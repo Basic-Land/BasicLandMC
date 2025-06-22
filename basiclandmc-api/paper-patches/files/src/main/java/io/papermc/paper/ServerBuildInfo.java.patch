@@ -4,7 +4,7 @@
      Key BRAND_DIVINEMC_ID = Key.key("bxteam", "divinemc");
      // DivineMC end
  
-+    // BasicLandMC start
++    // BasicLandMC start - Rebrand
 +    /**
 +     * The brand id for BasicLandMC.
 +     */

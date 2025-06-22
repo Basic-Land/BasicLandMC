@@ -1,42 +1,23 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: dan28000 <pirkldan28@gmail.com>
-Date: Sun, 18 May 2025 12:03:26 +0200
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Sun, 22 Jun 2025 20:01:30 +0200
 Subject: [PATCH] update-to-linear-and-addition-of-v3
 
 
-diff --git a/src/main/java/org/bxteam/divinemc/DivineConfig.java b/src/main/java/org/bxteam/divinemc/DivineConfig.java
-index 2cbe505c7c2c22565418ff2ae274b5e39e9b8ea3..2a2c6ebead4489e80c4d4fabe6c584fcf0851b0c 100644
---- a/src/main/java/org/bxteam/divinemc/DivineConfig.java
-+++ b/src/main/java/org/bxteam/divinemc/DivineConfig.java
-@@ -540,6 +540,7 @@ public class DivineConfig {
-     public static int linearFlushDelay = 100;
-     public static boolean linearUseVirtualThread = false;
-     public static int linearCompressionLevel = 1;
-+    public static boolean convertWorldToLinear = false;
-     private static void linearRegionFormat() {
-         regionFormatTypeName = RegionFileFormat.fromName(getString("settings.linear-region-format.type", regionFormatTypeName.name(),
-             "The type of region file format to use for storing chunk data.",
-@@ -550,7 +551,8 @@ public class DivineConfig {
-             "The implementation of the linear region file format to use.",
-             "Valid values:",
-             " - V1: Basic and default linear implementation",
--            " - V2: Introduces a grid-based compression scheme for better data management and flexibility (default)"));
-+            " - V2: Introduces a grid-based compression scheme for better data management and flexibility (default)",
-+            " - V3: Removes unused data from V2"));
+diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
+index ec1f579dcc142490317b4d7a991bc08513c0f691..b3c99441f440dfada696ae3d12e98a602acb72f8 100644
+--- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
++++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
+@@ -648,7 +648,8 @@ public class DivineConfig {
+                 "The implementation of the linear region file format to use.",
+                 "Valid values:",
+                 " - V1: Basic and default linear implementation",
+-                " - V2: Introduces a grid-based compression scheme for better data management and flexibility (default)"));
++                " - V2: Introduces a grid-based compression scheme for better data management and flexibility (default)",
++                " - V3: Removes unused data from V2"));
  
-         linearFlushMaxThreads = getInt("settings.linear-region-format.flush-max-threads", linearFlushMaxThreads,
-             "The maximum number of threads to use for flushing linear region files.",
-@@ -561,6 +563,10 @@ public class DivineConfig {
-             "Whether to use virtual threads for flushing.");
-         linearCompressionLevel = getInt("settings.linear-region-format.compression-level", linearCompressionLevel,
-             "The compression level to use for the linear region file format.");
-+        convertWorldToLinear = getBoolean("settings.linear-region-format.convert-world-to-linear", convertWorldToLinear,
-+            "Whether to convert the world to linear region format on startup.",
-+            "WARNING: This will convert the world to linear region format, and it may take a long time to complete.",
-+            "Make sure to backup your world before enabling this option.");
- 
-         setComment("settings.linear-region-format",
-             "The linear region file format is a custom region file format that is designed to be more efficient than the ANVIL format.",
+             linearFlushMaxThreads = getInt(ConfigCategory.MISC.key("region-format.flush-max-threads"), linearFlushMaxThreads,
+                 "The maximum number of threads to use for flushing linear region files.",
 diff --git a/src/main/java/org/bxteam/divinemc/region/LinearBase.java b/src/main/java/org/bxteam/divinemc/region/LinearBase.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..cab7965b4d669cb226a1a89d8b8e5ba31211a530
@@ -112,10 +93,10 @@ index e5215938c382a5d54a1166e14f17b533301272c7..923869f4eb16dfa721728b6a721bf25f
 +    }
  }
 diff --git a/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java b/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java
-index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c477b627e 100644
+index 3e25b2414dc7854c6cac3bccab39b71d4bbb90b0..394da327218c6b1b355c44a03dbb76c016e1fcfb 100644
 --- a/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java
 +++ b/src/main/java/org/bxteam/divinemc/region/LinearRegionFile.java
-@@ -2,16 +2,15 @@ package org.bxteam.divinemc.region;
+@@ -2,117 +2,50 @@ package org.bxteam.divinemc.region;
  
  import ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO;
  import com.github.luben.zstd.ZstdInputStream;
@@ -127,7 +108,7 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
  import net.minecraft.nbt.CompoundTag;
  import net.minecraft.world.level.ChunkPos;
 -import net.openhft.hashing.LongHashFunction;
--import org.bxteam.divinemc.DivineConfig;
+-import org.bxteam.divinemc.config.DivineConfig;
 -import org.bxteam.divinemc.spark.ThreadDumperRegistry;
 +import org.bxteam.divinemc.region.versions.V1Linear;
 +import org.bxteam.divinemc.region.versions.V2Linear;
@@ -135,13 +116,16 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
  import org.jspecify.annotations.Nullable;
  import org.slf4j.Logger;
  
-@@ -21,98 +20,39 @@ import java.io.ByteArrayOutputStream;
- import java.io.DataInputStream;
- import java.io.DataOutputStream;
- import java.io.File;
+-import java.io.BufferedOutputStream;
+-import java.io.ByteArrayInputStream;
+-import java.io.ByteArrayOutputStream;
+-import java.io.DataInputStream;
+-import java.io.DataOutputStream;
+-import java.io.File;
 -import java.io.FileOutputStream;
- import java.io.IOException;
- import java.io.InputStream;
+-import java.io.IOException;
+-import java.io.InputStream;
++import java.io.*;
  import java.nio.ByteBuffer;
  import java.nio.file.Files;
  import java.nio.file.Path;
@@ -203,7 +187,7 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
 -        Runnable flushCheck = () -> {
 -            while (!close) {
 -                synchronized (SAVE_LOCK) {
--                    if (markedToSave && activeSaveThreads < DivineConfig.linearFlushMaxThreads) {
+-                    if (markedToSave && activeSaveThreads < DivineConfig.MiscCategory.linearFlushMaxThreads) {
 -                        activeSaveThreads++;
 -                        Runnable flushOperation = () -> {
 -                            try {
@@ -216,7 +200,7 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
 -                                }
 -                            }
 -                        };
--                        Thread saveThread = DivineConfig.linearUseVirtualThread
+-                        Thread saveThread = DivineConfig.MiscCategory.linearUseVirtualThread
 -                            ? Thread.ofVirtual().name("Linear IO - " + this.hashCode()).unstarted(flushOperation)
 -                            : Thread.ofPlatform().name("Linear IO - " + this.hashCode()).unstarted(flushOperation);
 -                        saveThread.setPriority(Thread.NORM_PRIORITY - 3);
@@ -224,10 +208,10 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
 -                        ThreadDumperRegistry.REGISTRY.add(saveThread.getName());
 -                    }
 -                }
--                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(DivineConfig.linearFlushDelay));
+-                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(DivineConfig.MiscCategory.linearFlushDelay));
 -            }
 -        };
--        this.schedulingThread = DivineConfig.linearUseVirtualThread
+-        this.schedulingThread = DivineConfig.MiscCategory.linearUseVirtualThread
 -            ? Thread.ofVirtual().unstarted(flushCheck)
 -            : Thread.ofPlatform().unstarted(flushCheck);
 -        this.schedulingThread.setName("Linear IO Schedule - " + this.hashCode());
@@ -250,7 +234,7 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
              return;
          }
  
-@@ -126,315 +66,104 @@ public class LinearRegionFile implements IRegionFile {
+@@ -126,315 +59,104 @@ public class LinearRegionFile implements IRegionFile {
              }
  
              byte version = byteBuffer.get();
@@ -625,7 +609,7 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
               ZstdInputStream bucketZstdIn = new ZstdInputStream(bucketBAIS)) {
  
              ByteBuffer bucketBuffer = ByteBuffer.wrap(bucketZstdIn.readAllBytes());
-@@ -445,7 +174,7 @@ public class LinearRegionFile implements IRegionFile {
+@@ -445,7 +167,7 @@ public class LinearRegionFile implements IRegionFile {
                      int chunkIndex = (bx * cellsPerBucket + cx) + (bz * cellsPerBucket + cz) * 32;
                      int chunkSize = bucketBuffer.getInt();
                      long timestamp = bucketBuffer.getLong();
@@ -634,7 +618,7 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
  
                      if (chunkSize > 0) {
                          byte[] chunkData = new byte[chunkSize - 8];
-@@ -457,20 +186,19 @@ public class LinearRegionFile implements IRegionFile {
+@@ -457,20 +179,19 @@ public class LinearRegionFile implements IRegionFile {
                          byte[] finalCompressed = new byte[compressedLength];
                          System.arraycopy(compressed, 0, finalCompressed, 0, compressedLength);
  
@@ -658,7 +642,7 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
          openBucketForChunk(pos.x, pos.z);
          try {
              byte[] rawData = toByteArray(new ByteArrayInputStream(buffer.array()));
-@@ -486,9 +214,9 @@ public class LinearRegionFile implements IRegionFile {
+@@ -486,9 +207,9 @@ public class LinearRegionFile implements IRegionFile {
                  System.arraycopy(compressed, 0, finalCompressed, 0, compressedLength);
  
                  int index = getChunkIndex(pos.x, pos.z);
@@ -671,7 +655,7 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
              }
          } catch (IOException e) {
              LOGGER.error("Chunk write IOException {} {}", e, regionFilePath);
-@@ -498,41 +226,10 @@ public class LinearRegionFile implements IRegionFile {
+@@ -498,41 +219,10 @@ public class LinearRegionFile implements IRegionFile {
  
      @Override
      public DataOutputStream getChunkDataOutputStream(ChunkPos pos) {
@@ -713,7 +697,7 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
      private byte[] toByteArray(InputStream in) throws IOException {
          ByteArrayOutputStream out = new ByteArrayOutputStream();
          byte[] tempBuffer = new byte[4096];
-@@ -546,12 +243,11 @@ public class LinearRegionFile implements IRegionFile {
+@@ -546,12 +236,11 @@ public class LinearRegionFile implements IRegionFile {
      @Nullable
      @Override
      public synchronized DataInputStream getChunkDataInputStream(ChunkPos pos) {
@@ -729,7 +713,7 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
              return new DataInputStream(new ByteArrayInputStream(decompressed));
          }
          return null;
-@@ -559,19 +255,18 @@ public class LinearRegionFile implements IRegionFile {
+@@ -559,19 +248,18 @@ public class LinearRegionFile implements IRegionFile {
  
      @Override
      public synchronized void clear(ChunkPos pos) {
@@ -754,7 +738,7 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
          try {
              flush();
          } catch (IOException e) {
-@@ -579,14 +274,39 @@ public class LinearRegionFile implements IRegionFile {
+@@ -579,14 +267,39 @@ public class LinearRegionFile implements IRegionFile {
          }
      }
  
@@ -798,7 +782,7 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
      @Override
      public boolean recalculateHeader() {
          return false;
-@@ -606,54 +326,4 @@ public class LinearRegionFile implements IRegionFile {
+@@ -611,54 +324,4 @@ public class LinearRegionFile implements IRegionFile {
      public boolean isOversized(int x, int z) {
          return false;
      }
@@ -855,14 +839,14 @@ index 706f80f2fe2f66d1012b7505fef3b3429e16dc6c..c10d246f2eff8b2ece061c50be07121c
  }
 diff --git a/src/main/java/org/bxteam/divinemc/region/LinearRegionFileFlusher.java b/src/main/java/org/bxteam/divinemc/region/LinearRegionFileFlusher.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..dcd0a5503416ab5ba88bbb317a76f294e9c4f799
+index 0000000000000000000000000000000000000000..3781c0ed9277cc861e69d9d41119f46c9ba8d990
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/region/LinearRegionFileFlusher.java
 @@ -0,0 +1,54 @@
 +package org.bxteam.divinemc.region;
 +
 +import com.google.common.util.concurrent.ThreadFactoryBuilder;
-+import org.bxteam.divinemc.DivineConfig;
++import org.bxteam.divinemc.config.DivineConfig;
 +
 +import java.util.Queue;
 +import java.util.concurrent.*;
@@ -881,12 +865,12 @@ index 0000000000000000000000000000000000000000..dcd0a5503416ab5ba88bbb317a76f294
 +            .setNameFormat("linear-flusher-%d");
 +
 +
-+        if (DivineConfig.linearUseVirtualThread) {
++        if (DivineConfig.MiscCategory.linearUseVirtualThread) {
 +            factory.setThreadFactory(Thread.ofVirtual().factory());
 +        }
 +
 +        executor = Executors.newFixedThreadPool(
-+            DivineConfig.linearFlushMaxThreads,
++            DivineConfig.MiscCategory.linearFlushMaxThreads,
 +            factory.build()
 +        );
 +    }
@@ -914,7 +898,7 @@ index 0000000000000000000000000000000000000000..dcd0a5503416ab5ba88bbb317a76f294
 +    }
 +}
 diff --git a/src/main/java/org/bxteam/divinemc/region/RegionFileFactory.java b/src/main/java/org/bxteam/divinemc/region/RegionFileFactory.java
-index fbcdd68d7e72c2a52112cd3c8c3ab7b774493285..eee646aa74aec07c77fc056437cccd5bd7ad5c34 100644
+index 6d9584b623aea5906f5c69f4649aae84ec0512d4..a0b56bace2ac7eac3465d2b66fa94f391c0b25c3 100644
 --- a/src/main/java/org/bxteam/divinemc/region/RegionFileFactory.java
 +++ b/src/main/java/org/bxteam/divinemc/region/RegionFileFactory.java
 @@ -21,14 +21,9 @@ public class RegionFileFactory {
@@ -923,14 +907,14 @@ index fbcdd68d7e72c2a52112cd3c8c3ab7b774493285..eee646aa74aec07c77fc056437cccd5b
          final String extensionName = fullNameSplit[fullNameSplit.length - 1];
 -        switch (RegionFileFormat.fromExtension(extensionName)) {
 -            case LINEAR -> {
--                return new LinearRegionFile(path, DivineConfig.linearImplementation, DivineConfig.linearCompressionLevel);
+-                return new LinearRegionFile(path, DivineConfig.MiscCategory.linearImplementation, DivineConfig.MiscCategory.linearCompressionLevel);
 -            }
 -
 -            default -> {
 -                return new RegionFile(storageKey, path, directory, compressionFormat, dsync);
 -            }
 +        if (RegionFileFormat.fromExtension(extensionName) == RegionFileFormat.LINEAR) {
-+            return new LinearRegionFile(path, DivineConfig.linearImplementation, DivineConfig.linearCompressionLevel);
++            return new LinearRegionFile(path, DivineConfig.MiscCategory.linearImplementation, DivineConfig.MiscCategory.linearCompressionLevel);
          }
 +        return new RegionFile(storageKey, path, directory, compressionFormat, dsync);
      }
@@ -952,10 +936,10 @@ index 30a54e569c1923d53bc68e8ffbdb0a969a037b6c..3578310b11261a3d25c9c4020b8731fb
  
 diff --git a/src/main/java/org/bxteam/divinemc/region/V2LinearBase.java b/src/main/java/org/bxteam/divinemc/region/V2LinearBase.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..0c7b05f6d22895003fca1828d57a407dc4409f44
+index 0000000000000000000000000000000000000000..98d04c595e0f2ed8154277d06359e0649d008f1b
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/region/V2LinearBase.java
-@@ -0,0 +1,130 @@
+@@ -0,0 +1,129 @@
 +package org.bxteam.divinemc.region;
 +
 +import com.github.luben.zstd.ZstdInputStream;
@@ -1036,7 +1020,6 @@ index 0000000000000000000000000000000000000000..0c7b05f6d22895003fca1828d57a407d
 +            chunkTimestamps[i] = 0;
 +        }
 +
-+        int bucketCount = gridSize * gridSize;
 +        int cellCount = 32 / gridSize;
 +
 +        for (int bx = 0; bx < gridSize; bx++) {

@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Sun, 22 Jun 2025 20:25:48 +0200
+Subject: [PATCH] tps-bar-show-tps-of-server-option
+
+
+diff --git a/src/main/java/org/purpurmc/purpur/task/TPSBarTask.java b/src/main/java/org/purpurmc/purpur/task/TPSBarTask.java
+index 2eda6de8df6f8eb90bb84d12c3a88ca303664df4..b6ecadfb23bb4f694a3b0a138f927936267a02df 100644
+--- a/src/main/java/org/purpurmc/purpur/task/TPSBarTask.java
++++ b/src/main/java/org/purpurmc/purpur/task/TPSBarTask.java
+@@ -35,7 +35,11 @@ public class TPSBarTask extends BossBarTask {
+             ServerLevel serverLevel = ((CraftWorld)player.getWorld()).getHandle();
+ 
+             double worldMspt = calculateWorldMSPT(serverLevel);
+-            double worldTps = Math.min(20.0, 1000.0 / Math.max(worldMspt, 0.001));
++            double worldTps = this.tps;
++
++            if (!org.bxteam.divinemc.config.DivineConfig.AsyncCategory.showTPSOfServerInsteadOfWorld) {
++                worldTps = Math.min(20.0, 1000.0 / Math.max(worldMspt, 0.001));
++            }
+ 
+             double originalTps = this.tps;
+             double originalMspt = this.mspt;
