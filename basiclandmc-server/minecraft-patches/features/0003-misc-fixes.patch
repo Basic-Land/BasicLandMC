@@ -3,20 +3,6 @@ From: dan28000 <pirkldan28@gmail.com>
 Date: Thu, 24 Apr 2025 21:03:19 +0200
 Subject: [PATCH] misc-fixes
 
-
-diff --git a/net/minecraft/network/Connection.java b/net/minecraft/network/Connection.java
-index 00a82873d226f113278632a53c0faca420dd67d4..296c3affa7706b3026d25d477ab6e33e61d970d7 100644
---- a/net/minecraft/network/Connection.java
-+++ b/net/minecraft/network/Connection.java
-@@ -325,7 +325,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
- 
-     private static void syncAfterConfigurationChange(ChannelFuture future) {
-         try {
--            future.syncUninterruptibly();
-+            future.awaitUninterruptibly(5000L); // BasiclandMC - 5 second timeout to mitigate deadlocks
-         } catch (Exception var2) {
-             if (var2 instanceof ClosedChannelException) {
-                 LOGGER.info("Connection closed during protocol change");
 diff --git a/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 index b1fd00bed129feb96b998e7e1169fed1e9c3ad22..e10b5e2924124227139cff7dc6675c38905d438f 100644
 --- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
