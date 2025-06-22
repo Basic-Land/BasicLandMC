@@ -1,14 +1,14 @@
 --- a/divinemc-server/build.gradle.kts
 +++ b/divinemc-server/build.gradle.kts
-@@ -33,6 +_,7 @@
- 
+@@ -41,6 +_,7 @@
+     // DivineMC start - Rebrand
      val divinemc = forks.register("divinemc") {
          forks = purpur
 +        rootDirectory = upstreamsDirectory().map { it.dir("divinemc") }
          upstream.patchRepo("paperServer") {
              upstreamRepo = purpur.patchedRepo("paperServer")
              patchesDir = rootDirectory.dir("divinemc-server/paper-patches")
-@@ -46,7 +_,27 @@
+@@ -54,7 +_,33 @@
          }
      }
  
@@ -27,59 +27,66 @@
 +        }
 +        upstream.patchDir("divinemcServer") {
 +            upstreamPath = "divinemc-server"
-+            excludes = setOf("src/minecraft", "paper-patches", "minecraft-patches", "build.gradle.kts", "build.gradle.kts.patch")
++            excludes = setOf(
++                "src/minecraft",
++                "paper-patches",
++                "minecraft-patches",
++                "build.gradle.kts",
++                "build.gradle.kts.patch"
++            )
 +            patchesDir = rootDirectory.dir("basiclandmc-server/divinemc-patches")
 +            outputDir = rootDirectory.dir("divinemc-server")
 +        }
 +    }
 +
 +    activeFork = basiclandmc
+     // DivineMC end - Rebrand
  
      spigot {
-         buildDataRef = "3edaf46ec1eed4115ce1b18d2846cded42577e42"
-@@ -134,12 +_,16 @@
-         resources { srcDir("../paper-server/src/main/resources") }
+@@ -148,6 +_,8 @@
          java { srcDir("../purpur-server/src/main/java") }
          resources { srcDir("../purpur-server/src/main/resources") }
+         // DivineMC end - Rebrand
 +        java { srcDir("../divinemc-server/src/main/java") }
 +        resources { srcDir("../divinemc-server/src/main/resources") }
      }
      test {
          java { srcDir("../paper-server/src/test/java") }
-         resources { srcDir("../paper-server/src/test/resources") }
+@@ -156,6 +_,8 @@
          java { srcDir("../purpur-server/src/test/java") }
          resources { srcDir("../purpur-server/src/test/resources") }
+         // DivineMC end - Rebrand
 +        java { srcDir("../divinemc-server/src/test/java") }
 +        resources { srcDir("../divinemc-server/src/test/resources") }
      }
  }
- 
-@@ -163,7 +_,7 @@
+ val log4jPlugins = sourceSets.create("log4jPlugins") {
+@@ -183,7 +_,7 @@
  }
  
  dependencies {
--    implementation(project(":divinemc-api")) // DivineMC
-+    implementation(project(":basiclandmc-api")) // DivineMC
+-    implementation(project(":divinemc-api")) // DivineMC - Rebrand
++    implementation(project(":basiclandmc-api")) // BasiclandMC - Rebrand
  
-     // DivineMC start
+     // DivineMC start - Dependencies
      implementation("org.yaml:snakeyaml:2.3")
-@@ -263,14 +_,14 @@
-         val experimental = rootProject.providers.gradleProperty("experimental").get()
+@@ -294,14 +_,14 @@
+         val experimental = rootProject.providers.gradleProperty("experimental").get() // DivineMC - Experimental flag
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",
--            "Implementation-Title" to "DivineMC", // DivineMC
-+            "Implementation-Title" to "BasiclandMC", // BasiclandMC
+-            "Implementation-Title" to "DivineMC", // DivineMC - Rebrand
++            "Implementation-Title" to "BasiclandMC", // BasiclandMC - Rebrand
              "Implementation-Version" to implementationVersion,
              "Implementation-Vendor" to date,
--            "Specification-Title" to "DivineMC", // DivineMC
-+            "Specification-Title" to "BasiclandMC", // BasiclandMC
+-            "Specification-Title" to "DivineMC", // DivineMC - Rebrand
++            "Specification-Title" to "BasiclandMC", // BasiclandMC - Rebrand
              "Specification-Version" to project.version,
--            "Specification-Vendor" to "BX Team", // DivineMC
--            "Brand-Id" to "bxteam:divinemc", // DivineMC
--            "Brand-Name" to "DivineMC", // DivineMC
-+            "Specification-Vendor" to "BL dev", // BasiclandMC
-+            "Brand-Id" to "basicland:basiclandmc", // BasiclandMC
-+            "Brand-Name" to "BasiclandMC", // BasiclandMC
+-            "Specification-Vendor" to "BX Team", // DivineMC - Rebrand
+-            "Brand-Id" to "bxteam:divinemc", // DivineMC - Rebrand
+-            "Brand-Name" to "DivineMC", // DivineMC - Rebrand
++            "Specification-Vendor" to "BL Team", // DivineMC - Rebrand
++            "Brand-Id" to "basicland:basiclandmc", // BasiclandMC - Rebrand
++            "Brand-Name" to "BasiclandMC", // BasiclandMC - Rebrand
              "Build-Number" to (build ?: ""),
              "Build-Time" to buildTime.toString(),
              "Git-Branch" to gitBranch,
