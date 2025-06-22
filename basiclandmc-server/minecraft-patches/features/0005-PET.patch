@@ -5,73 +5,100 @@ Subject: [PATCH] PET
 
 
 diff --git a/net/minecraft/server/level/ServerChunkCache.java b/net/minecraft/server/level/ServerChunkCache.java
-index 62f4d6021aa3abcb563dff5de2e2b1f30d72c986..1040ae68f7835b9d0143f470aaf3ee3265e47408 100644
+index 62f4d6021aa3abcb563dff5de2e2b1f30d72c986..35ab251c752f187cf7c0c06e18d7fb6333e862c3 100644
 --- a/net/minecraft/server/level/ServerChunkCache.java
 +++ b/net/minecraft/server/level/ServerChunkCache.java
-@@ -473,24 +473,24 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+@@ -3,6 +3,7 @@ package net.minecraft.server.level;
+ import com.google.common.annotations.VisibleForTesting;
+ import com.mojang.datafixers.DataFixer;
+ import com.mojang.logging.LogUtils;
++import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+ import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
+ import java.io.IOException;
+ import java.nio.file.Path;
+@@ -473,51 +474,95 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
      private static final int[] DZ = {0, 0, 1, -1, 1, 1, -1, -1};
  
      // BasicLandMC - Rewrite of the original method start
 -    private List<LevelChunk>[] splitChunksIntoRegions(List<LevelChunk> chunks) {
-+    private RegionData[] splitChunksIntoRegions(List<LevelChunk> chunks) {
-         if (chunks.isEmpty()) {
+-        if (chunks.isEmpty()) {
 -            return new List[0];
-+            return new RegionData[0];
-         }
+-        }
++    private RegionData[] splitChunksIntoRegions(List<LevelChunk> chunks) {
++        if (chunks.isEmpty()) return new RegionData[0];
  
-         int size = chunks.size();
-         it.unimi.dsi.fastutil.objects.ObjectOpenHashSet<LevelChunk> chunkSet = new it.unimi.dsi.fastutil.objects.ObjectOpenHashSet<>(chunks);
+-        int size = chunks.size();
+-        it.unimi.dsi.fastutil.objects.ObjectOpenHashSet<LevelChunk> chunkSet = new it.unimi.dsi.fastutil.objects.ObjectOpenHashSet<>(chunks);
++        final it.unimi.dsi.fastutil.objects.ObjectOpenHashSet<LevelChunk> chunkSet = new it.unimi.dsi.fastutil.objects.ObjectOpenHashSet<>(chunks);
++        final int size = chunkSet.size();
  
 -        List<List<LevelChunk>> groups = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(Math.max(1, size / 16));
-+        it.unimi.dsi.fastutil.objects.ObjectArrayList<RegionData> groups = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(Math.max(1, level.players.size()));
-         LevelChunk[] stack = new LevelChunk[size];
+-        LevelChunk[] stack = new LevelChunk[size];
 -        int stackPointer;
-+        it.unimi.dsi.fastutil.longs.Long2IntMap chunkToRegionMap = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap(size);
++        final ObjectArrayList<RegionData> regions = new ObjectArrayList<>(Math.max(1, level.players.size()));
++        final LevelChunk[] stack = new LevelChunk[size];
++        final it.unimi.dsi.fastutil.longs.Long2IntMap chunkToRegionMap = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap(size);
++        chunkToRegionMap.defaultReturnValue(-1);
++        final int maxRegionSize = maxChunksForViewDistance();
  
          for (LevelChunk chunk : chunks) {
              if (!chunkSet.contains(chunk)) continue;
  
-             it.unimi.dsi.fastutil.objects.ObjectArrayList<LevelChunk> group = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(64);
+-            it.unimi.dsi.fastutil.objects.ObjectArrayList<LevelChunk> group = new it.unimi.dsi.fastutil.objects.ObjectArrayList<>(64);
              stack[0] = chunk;
 -            stackPointer = 1;
 +            int stackPointer = 1;
              chunkSet.remove(chunk);
  
++            final RegionData regionData = new RegionData(new ObjectArrayList<>(maxRegionSize), new ObjectArrayList<>());
++            regions.add(regionData);
++            int index = regions.size() - 1;
++
              while (stackPointer > 0) {
-@@ -505,19 +505,62 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+                 LevelChunk current = stack[--stackPointer];
+-                group.add(current);
++                regionData.chunks.add(current);
++                chunkToRegionMap.put(current.coordinateKey, index);
+ 
+                 for (int i = 0; i < 8; i++) {
+-                    LevelChunk neighbor = getChunk(current.locX + DX[i], current.locZ + DZ[i], false);
++                    LevelChunk neighbor = fullChunks.get(ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(current.locX + DX[i], current.locZ + DZ[i]));
+                     if (neighbor != null && chunkSet.remove(neighbor)) {
+                         stack[stackPointer++] = neighbor;
+                     }
                  }
              }
  
 -            groups.add(group);
-+            RegionData regionData = new RegionData(group, new it.unimi.dsi.fastutil.objects.ObjectArrayList<>());
-+            groups.add(regionData);
-+            int index = groups.indexOf(regionData);
++            if (chunkSet.isEmpty()) break;
++        }
 +
-+            for (LevelChunk regionChunk : group) {
-+                chunkToRegionMap.put(regionChunk.coordinateKey, index);
-+            }
++        level.entityTickList.entities.forEach(entity -> {
++            long chunkKey = entity.chunkPosition().longKey;
  
-             if (chunkSet.isEmpty()) {
-                 break;
+-            if (chunkSet.isEmpty()) {
+-                break;
++            int regionIndex = chunkToRegionMap.get(chunkKey);
++            if (regionIndex != -1) {
++                RegionData regionData = regions.get(regionIndex);
++                regionData.entities().add(entity);
++            } else {
++                tickEntity(entity);
              }
-         }
+-        }
++        });
  
 -        @SuppressWarnings("unchecked")
 -        List<LevelChunk>[] result = new List[groups.size()];
 -        return groups.toArray(result);
-+        level.entityTickList.entities.forEach(entity -> {
-+            long chunkKey = entity.chunkPosition().longKey;
++        return regions.toArray(new RegionData[0]);
+     }
 +
-+            int index = chunkToRegionMap.get(chunkKey);
-+            RegionData regionData = groups.get(index);
-+            if (regionData != null) {
-+                regionData.entities().add(entity);
-+            } else {
-+                tickEntity(entity);
-+            }
-+        });
-+
-+        return groups.toArray(new RegionData[0]);
++    // Should be max safe estimate of ticking chunks in a region
++    private int maxChunksForViewDistance() {
++        ca.spottedleaf.moonrise.patches.chunk_system.player.RegionizedPlayerChunkLoader.ViewDistances distances = level.moonrise$getViewDistanceHolder().getViewDistances();
++        int diameter = 2 * distances.tickViewDistance() + 1;
++        return diameter * diameter;
 +    }
 +
 +    private void tickEntity(Entity entity) {
@@ -92,7 +119,7 @@ index 62f4d6021aa3abcb563dff5de2e2b1f30d72c986..1040ae68f7835b9d0143f470aaf3ee32
 +                level.guardEntityTick(level::tickNonPassenger, entity);
 +            }
 +        }
-     }
++    }
 +
      // DivineMC end - Regionized Chunk Ticking // BasicLandMC - Rewrite of the original method end
  
@@ -105,7 +132,7 @@ index 62f4d6021aa3abcb563dff5de2e2b1f30d72c986..1040ae68f7835b9d0143f470aaf3ee32
      @Override
      public void tick(BooleanSupplier hasTimeLeft, boolean tickChunks) {
          if (this.level.tickRateManager().runsNormally() || !tickChunks || this.level.spigotConfig.unloadFrozenChunks) { // Spigot
-@@ -572,14 +615,13 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+@@ -572,14 +617,13 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
                  this.processChunksRegionized(l, list); // BasicLandMC - Move regionized chunk ticking to its own method
              } else {
                  this.tickChunks(l, list);
@@ -121,7 +148,7 @@ index 62f4d6021aa3abcb563dff5de2e2b1f30d72c986..1040ae68f7835b9d0143f470aaf3ee32
          // DivineMC start - Async mob spawning
          if (org.bxteam.divinemc.DivineConfig.enableAsyncSpawning) {
              for (ServerPlayer player : this.level.players) {
-@@ -616,7 +658,7 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+@@ -616,7 +660,7 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
  
      // BasicLandMC - Move regionized chunk ticking to its own method start
      private void processChunksRegionized(final long timeDelta, final List<LevelChunk> chunks) {
@@ -130,7 +157,7 @@ index 62f4d6021aa3abcb563dff5de2e2b1f30d72c986..1040ae68f7835b9d0143f470aaf3ee32
          final int regionCount = regions.length;
  
          if (regionCount == 0) {
-@@ -626,10 +668,11 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+@@ -626,10 +670,11 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
          java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(regionCount);
  
          try {
@@ -143,7 +170,7 @@ index 62f4d6021aa3abcb563dff5de2e2b1f30d72c986..1040ae68f7835b9d0143f470aaf3ee32
                          if (region == null || region.isEmpty()) {
                              latch.countDown();
                              continue;
-@@ -637,12 +680,16 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+@@ -637,12 +682,16 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
  
                          REGION_EXECUTOR.execute(() -> {
                              try {
@@ -161,6 +188,36 @@ index 62f4d6021aa3abcb563dff5de2e2b1f30d72c986..1040ae68f7835b9d0143f470aaf3ee32
  
                      latch.await();
                      return true;
+@@ -742,15 +791,21 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+ 
+         for (LevelChunk levelChunk : chunks) {
+             ChunkPos pos = levelChunk.getPos();
+-            levelChunk.incrementInhabitedTime(timeInhabited);
+-            // DivineMC start - Async mob spawning
+-            if (!filteredSpawningCategories.isEmpty() && this.level.getWorldBorder().isWithinBounds(pos) && (!org.bxteam.divinemc.DivineConfig.enableAsyncSpawning || spawnCountsReady.get()) && this.chunkMap.anyPlayerCloseEnoughForSpawning(pos, true)) { // Spigot
+-                NaturalSpawner.spawnForChunk(this.level, levelChunk, lastSpawnState, filteredSpawningCategories);
+-            // DivineMC end - Async mob spawning
+-            }
++            try {
++                levelChunk.incrementInhabitedTime(timeInhabited);
++                // DivineMC start - Async mob spawning
++                if (!filteredSpawningCategories.isEmpty() && this.level.getWorldBorder().isWithinBounds(pos) && (!org.bxteam.divinemc.DivineConfig.enableAsyncSpawning || spawnCountsReady.get()) && this.chunkMap.anyPlayerCloseEnoughForSpawning(pos, true)) { // Spigot
++                    NaturalSpawner.spawnForChunk(this.level, levelChunk, lastSpawnState, filteredSpawningCategories);
++                    // DivineMC end - Async mob spawning
++                }
+ 
+-            if (true) { // Paper - rewrite chunk system
+-                this.level.tickChunk(levelChunk, _int);
++                if (true) { // Paper - rewrite chunk system
++                    this.level.tickChunk(levelChunk, _int);
++                }
++            } catch (Exception e) {
++                int chunkX = pos.getMiddleBlockX();
++                int chunkZ = pos.getMiddleBlockZ();
++                LOGGER.error("Exception ticking chunk at {},{}", chunkX, chunkZ, e);
+             }
+         }
+ 
 diff --git a/net/minecraft/server/level/ServerLevel.java b/net/minecraft/server/level/ServerLevel.java
 index 5a25df1e002b3674bf811442f924fbe8ba5a1dae..aa2d504ee9bce19b534352f39176a8638f8bae8c 100644
 --- a/net/minecraft/server/level/ServerLevel.java
