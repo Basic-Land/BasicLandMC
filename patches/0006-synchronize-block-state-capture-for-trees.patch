@@ -1,0 +1,136 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <pirkldan28@gmail.com>
+Date: Mon, 9 Jun 2025 21:36:45 +0200
+Subject: [PATCH] synchronize-block-state-capture-for-trees
+
+
+diff --git a/net/minecraft/core/dispenser/DispenseItemBehavior.java b/net/minecraft/core/dispenser/DispenseItemBehavior.java
+index d7488164313cbf038ff7669da275bfdb41e8343c..a4e9feed1ad506162a157a6d4aa9b8e97bd3bca6 100644
+--- a/net/minecraft/core/dispenser/DispenseItemBehavior.java
++++ b/net/minecraft/core/dispenser/DispenseItemBehavior.java
+@@ -509,14 +509,15 @@ public interface DispenseItemBehavior {
+                 }
+                 // CraftBukkit start
+                 level.captureTreeGeneration = false;
+-                if (level.capturedBlockStates.size() > 0) {
++                oshi.util.tuples.Pair<Boolean, List<org.bukkit.block.BlockState>> capturedBlockStates = level.getCapturedBlockStates(); //BasiclandMC - synchronize capture
++
++                if (!capturedBlockStates.getA()) {
+                     // DivineMC start - Parallel world ticking
+                     org.bukkit.TreeType treeType = net.minecraft.world.level.block.SaplingBlock.getTreeTypeTL();
+                     net.minecraft.world.level.block.SaplingBlock.setTreeTypeTL(null);
+                     // DivineMC end - Parallel world ticking
+                     org.bukkit.Location location = org.bukkit.craftbukkit.util.CraftLocation.toBukkit(blockPos, level.getWorld());
+-                    List<org.bukkit.block.BlockState> blocks = new java.util.ArrayList<>(level.capturedBlockStates.values());
+-                    level.capturedBlockStates.clear();
++                    List<org.bukkit.block.BlockState> blocks = capturedBlockStates.getB();
+                     org.bukkit.event.world.StructureGrowEvent structureEvent = null;
+                     if (treeType != null) {
+                         structureEvent = new org.bukkit.event.world.StructureGrowEvent(location, treeType, false, null, blocks);
+diff --git a/net/minecraft/world/item/ItemStack.java b/net/minecraft/world/item/ItemStack.java
+index aab99336ee125db3f37dbb3c6f328fb0c4317181..5eb4a240eee0c34028578a311a226e9c6cec00fd 100644
+--- a/net/minecraft/world/item/ItemStack.java
++++ b/net/minecraft/world/item/ItemStack.java
+@@ -410,15 +410,16 @@ public final class ItemStack implements DataComponentHolder {
+             int newCount = this.getCount();
+             this.setCount(oldCount);
+             this.restorePatch(previousPatch);
+-            if (interactionResult.consumesAction() && serverLevel.captureTreeGeneration && !serverLevel.capturedBlockStates.isEmpty()) {
++            oshi.util.tuples.Pair<Boolean, List<org.bukkit.craftbukkit.block.CraftBlockState>> capturedBlockStatesCraft = serverLevel.getCapturedBlockStatesCraft(); //BasiclandMC - synchronize capture
++
++            if (interactionResult.consumesAction() && serverLevel.captureTreeGeneration && !capturedBlockStatesCraft.getA()) {
+                 serverLevel.captureTreeGeneration = false;
+                 org.bukkit.Location location = org.bukkit.craftbukkit.util.CraftLocation.toBukkit(clickedPos, serverLevel.getWorld());
+                 // DivineMC start - Parallel world ticking
+                 org.bukkit.TreeType treeType = net.minecraft.world.level.block.SaplingBlock.getTreeTypeTL();
+                 net.minecraft.world.level.block.SaplingBlock.setTreeTypeTL(null);
+                 // DivineMC end - Parallel world ticking
+-                List<org.bukkit.craftbukkit.block.CraftBlockState> blocks = new java.util.ArrayList<>(serverLevel.capturedBlockStates.values());
+-                serverLevel.capturedBlockStates.clear();
++                List<org.bukkit.craftbukkit.block.CraftBlockState> blocks = capturedBlockStatesCraft.getB();
+                 org.bukkit.event.world.StructureGrowEvent structureEvent = null;
+                 if (treeType != null) {
+                     boolean isBonemeal = this.getItem() == Items.BONE_MEAL;
+@@ -451,8 +452,10 @@ public final class ItemStack implements DataComponentHolder {
+             if (player != null && interactionResult instanceof InteractionResult.Success success && success.wasItemInteraction()) {
+                 InteractionHand hand = context.getHand();
+                 org.bukkit.event.block.BlockPlaceEvent placeEvent = null;
+-                List<org.bukkit.block.BlockState> blocks = new java.util.ArrayList<>(serverLevel.capturedBlockStates.values());
+-                serverLevel.capturedBlockStates.clear();
++
++                oshi.util.tuples.Pair<Boolean, List<org.bukkit.block.BlockState>> capturedBlockStates = serverLevel.getCapturedBlockStates(); //BasiclandMC - synchronize capture
++
++                List<org.bukkit.block.BlockState> blocks = capturedBlockStates.getB();
+                 if (blocks.size() > 1) {
+                     placeEvent = org.bukkit.craftbukkit.event.CraftEventFactory.callBlockMultiPlaceEvent(serverLevel, player, hand, blocks, clickedPos.getX(), clickedPos.getY(), clickedPos.getZ());
+                 } else if (blocks.size() == 1 && item != Items.POWDER_SNOW_BUCKET) { // Paper - Fix cancelled powdered snow bucket placement
+diff --git a/net/minecraft/world/level/Level.java b/net/minecraft/world/level/Level.java
+index 3032663fee81a22c2890cc2c1a8e902b71dec8fb..2143fd249be2949b1d595dc109712428aa81555a 100644
+--- a/net/minecraft/world/level/Level.java
++++ b/net/minecraft/world/level/Level.java
+@@ -148,7 +148,7 @@ public abstract class Level implements LevelAccessor, AutoCloseable, ca.spottedl
+     public boolean captureBlockStates = false;
+     public boolean captureTreeGeneration = false;
+     public boolean isBlockPlaceCancelled = false; // Paper - prevent calling cleanup logic when undoing a block place upon a cancelled BlockPlaceEvent
+-    public Map<BlockPos, org.bukkit.craftbukkit.block.CraftBlockState> capturedBlockStates = java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>()); // Paper
++    public final Map<BlockPos, org.bukkit.craftbukkit.block.CraftBlockState> capturedBlockStates = java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>()); // Paper //BasiclandMC - make final
+     public Map<BlockPos, BlockEntity> capturedTileEntities = new java.util.LinkedHashMap<>(); // Paper - Retain block place order when capturing blockstates
+     public List<net.minecraft.world.entity.item.ItemEntity> captureDrops;
+     public final it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap<SpawnCategory> ticksPerSpawnCategory = new it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap<>();
+@@ -2200,4 +2200,28 @@ public abstract class Level implements LevelAccessor, AutoCloseable, ca.spottedl
+         return getWorld().getEnvironment() == org.bukkit.World.Environment.THE_END;
+     }
+     // Purpur end - Add allow water in end world option
++
++    //BasiclandMC start
++    private <T extends org.bukkit.block.BlockState> oshi.util.tuples.Pair<Boolean, List<T>> getCapturedBlockStates(java.util.function.Function<CraftBlockState, T> converter) {
++        synchronized(this.capturedBlockStates) {
++            boolean empty;
++            java.util.List<T> blocks = new java.util.ArrayList<>();
++            if (!(empty = capturedBlockStates.isEmpty())) {
++                for (CraftBlockState state : capturedBlockStates.values()) {
++                    blocks.add(converter.apply(state));
++                }
++                capturedBlockStates.clear();
++            }
++            return new oshi.util.tuples.Pair<>(empty, blocks);
++        }
++    }
++
++    public oshi.util.tuples.Pair<Boolean, List<org.bukkit.block.BlockState>> getCapturedBlockStates() {
++        return getCapturedBlockStates(state -> state);
++    }
++
++    public oshi.util.tuples.Pair<Boolean, List<org.bukkit.craftbukkit.block.CraftBlockState>> getCapturedBlockStatesCraft() {
++        return getCapturedBlockStates(state -> state);
++    }
++    //BasiclandMC end
+ }
+diff --git a/net/minecraft/world/level/block/SaplingBlock.java b/net/minecraft/world/level/block/SaplingBlock.java
+index 6402651e613c2376c2315d2b3dd55a707810f684..a5466a05fc257d06ae6770d31fcb787fa7a19f2e 100644
+--- a/net/minecraft/world/level/block/SaplingBlock.java
++++ b/net/minecraft/world/level/block/SaplingBlock.java
+@@ -17,6 +17,8 @@ import net.minecraft.world.level.block.state.properties.IntegerProperty;
+ import net.minecraft.world.phys.shapes.CollisionContext;
+ import net.minecraft.world.phys.shapes.VoxelShape;
+ 
++import java.util.List;
++
+ public class SaplingBlock extends BushBlock implements BonemealableBlock {
+     public static final MapCodec<SaplingBlock> CODEC = RecordCodecBuilder.mapCodec(
+         instance -> instance.group(TreeGrower.CODEC.fieldOf("tree").forGetter(saplingBlock -> saplingBlock.treeGrower), propertiesCodec())
+@@ -83,9 +85,11 @@ public class SaplingBlock extends BushBlock implements BonemealableBlock {
+                 level.captureTreeGeneration = true;
+                 this.treeGrower.growTree(level, level.getChunkSource().getGenerator(), pos, state, random);
+                 level.captureTreeGeneration = false;
+-                if (!level.capturedBlockStates.isEmpty()) {
+-                    java.util.List<org.bukkit.block.BlockState> blocks = new java.util.ArrayList<>(level.capturedBlockStates.values());
+-                    level.capturedBlockStates.clear();
++
++                oshi.util.tuples.Pair<Boolean, List<org.bukkit.block.BlockState>> capturedBlockStates = level.getCapturedBlockStates(); //BasiclandMC - synchronize capture
++
++                if (!capturedBlockStates.getA()) {
++                    java.util.List<org.bukkit.block.BlockState> blocks = capturedBlockStates.getB();
+                     // DivineMC start - Parallel world ticking
+                     org.bukkit.TreeType treeTypeLocal = SaplingBlock.getTreeTypeTL();
+                     SaplingBlock.setTreeTypeTL(null);
