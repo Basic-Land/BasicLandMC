@@ -1,6 +1,6 @@
 --- a/divinemc-server/build.gradle.kts
 +++ b/divinemc-server/build.gradle.kts
-@@ -41,6 +_,7 @@
+@@ -43,6 +_,7 @@
      // DivineMC start - Rebrand
      val divinemc = forks.register("divinemc") {
          forks = purpur
@@ -8,11 +8,27 @@
          upstream.patchRepo("paperServer") {
              upstreamRepo = purpur.patchedRepo("paperServer")
              patchesDir = rootDirectory.dir("divinemc-server/paper-patches")
-@@ -54,7 +_,33 @@
+@@ -50,15 +_,49 @@
+         }
+         upstream.patchDir("purpurServer") {
+             upstreamPath = "purpur-server"
+-            excludes = setOf("src/minecraft", "paper-patches", "minecraft-patches", "build.gradle.kts", "build.gradle.kts.patch")
++            excludes = setOf(
++                "src/minecraft",
++                "paper-patches",
++                "minecraft-patches",
++                "build.gradle.kts",
++                "build.gradle.kts.patch"
++            )
+             patchesDir = rootDirectory.dir("divinemc-server/purpur-patches")
+             outputDir = rootDirectory.dir("purpur-server")
          }
      }
- 
+-
 -    activeFork = divinemc
+     // DivineMC end - Rebrand
+ 
++    // BasicLandMC start - Rebrand
 +    val basiclandmc = forks.register("basiclandmc") {
 +        forks = divinemc
 +        upstream.patchRepo("paperServer") {
@@ -40,37 +56,77 @@
 +    }
 +
 +    activeFork = basiclandmc
-     // DivineMC end - Rebrand
- 
++    // BasicLandMC end - Rebrand
++
      spigot {
-@@ -148,6 +_,8 @@
+         enabled = true
+         buildDataRef = "281ac0de7a76d808753ede97d11b034bc801b63d"
+@@ -93,6 +_,7 @@
+     @get:Inject
+     abstract val archiveOperations: ArchiveOperations
+ }
++
+ val services = objects.newInstance<Services>()
+ 
+ if (project.providers.gradleProperty("publishDevBundle").isPresent) {
+@@ -150,6 +_,10 @@
          java { srcDir("../purpur-server/src/main/java") }
          resources { srcDir("../purpur-server/src/main/resources") }
          // DivineMC end - Rebrand
++        // BasicLandMC start - Rebrand
 +        java { srcDir("../divinemc-server/src/main/java") }
 +        resources { srcDir("../divinemc-server/src/main/resources") }
++        // BasicLandMC end - Rebrand
      }
      test {
          java { srcDir("../paper-server/src/test/java") }
-@@ -156,6 +_,8 @@
+@@ -158,6 +_,10 @@
          java { srcDir("../purpur-server/src/test/java") }
          resources { srcDir("../purpur-server/src/test/resources") }
          // DivineMC end - Rebrand
++        // BasicLandMC start - Rebrand
 +        java { srcDir("../divinemc-server/src/test/java") }
 +        resources { srcDir("../divinemc-server/src/test/resources") }
++        // BasicLandMC end - Rebrand
      }
  }
  val log4jPlugins = sourceSets.create("log4jPlugins") {
-@@ -183,7 +_,7 @@
+@@ -175,6 +_,7 @@
+ 
+ // Configure mockito agent that is needed in newer java versions
+ val mockitoAgent = configurations.register("mockitoAgent")
++
+ abstract class MockitoAgentProvider : CommandLineArgumentProvider {
+     @get:CompileClasspath
+     abstract val fileCollection: ConfigurableFileCollection
+@@ -185,12 +_,12 @@
  }
  
  dependencies {
 -    implementation(project(":divinemc-api")) // DivineMC - Rebrand
-+    implementation(project(":basiclandmc-api")) // BasiclandMC - Rebrand
++    implementation(project(":basiclandmc-api")) // BasicLandMC - Rebrand
  
      // DivineMC start - Dependencies
      implementation("org.yaml:snakeyaml:2.3")
-@@ -294,14 +_,14 @@
+-    implementation ("me.carleslc.Simple-YAML:Simple-Yaml:1.8.4") {
+-        exclude(group="org.yaml", module="snakeyaml")
++    implementation("me.carleslc.Simple-YAML:Simple-Yaml:1.8.4") {
++        exclude(group = "org.yaml", module = "snakeyaml")
+     }
+     implementation("net.objecthunter:exp4j:0.4.8")
+     implementation("org.agrona:agrona:2.0.1")
+@@ -255,7 +_,9 @@
+     testImplementation("org.junit.platform:junit-platform-suite-engine:1.12.2")
+     testImplementation("org.hamcrest:hamcrest:3.0") // DivineMC - Bump dependencies
+     testImplementation("org.mockito:mockito-core:5.16.1") // DivineMC - Bump dependencies
+-    mockitoAgent("org.mockito:mockito-core:5.16.1") { isTransitive = false } // Configure mockito agent that is needed in newer java versions // DivineMC - Bump dependencies
++    mockitoAgent("org.mockito:mockito-core:5.16.1") {
++        isTransitive = false
++    } // Configure mockito agent that is needed in newer java versions // DivineMC - Bump dependencies
+     testImplementation("org.ow2.asm:asm-tree:9.8")
+     testImplementation("org.junit-pioneer:junit-pioneer:2.3.0") // CartesianTest // DivineMC - Bump dependencies
+ 
+@@ -296,14 +_,14 @@
          val experimental = rootProject.providers.gradleProperty("experimental").get() // DivineMC - Experimental flag
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",
@@ -84,9 +140,30 @@
 -            "Specification-Vendor" to "BX Team", // DivineMC - Rebrand
 -            "Brand-Id" to "bxteam:divinemc", // DivineMC - Rebrand
 -            "Brand-Name" to "DivineMC", // DivineMC - Rebrand
-+            "Specification-Vendor" to "BL Team", // DivineMC - Rebrand
++            "Specification-Vendor" to "BL Team", // BasiclandMC - Rebrand
 +            "Brand-Id" to "basicland:basiclandmc", // BasiclandMC - Rebrand
 +            "Brand-Name" to "BasiclandMC", // BasiclandMC - Rebrand
              "Build-Number" to (build ?: ""),
              "Build-Time" to buildTime.toString(),
              "Git-Branch" to gitBranch,
+@@ -363,7 +_,8 @@
+     jvmArgumentProviders.add(provider)
+ }
+ 
+-val generatedDir: java.nio.file.Path = layout.projectDirectory.dir("../paper-server/src/generated/java").asFile.toPath() // Purpur
++val generatedDir: java.nio.file.Path =
++    layout.projectDirectory.dir("../paper-server/src/generated/java").asFile.toPath() // Purpur
+ idea {
+     module {
+         generatedSourceDirs.add(generatedDir.toFile())
+@@ -509,7 +_,9 @@
+ 
+ fill {
+     project("paper")
+-    versionFamily(paperweight.minecraftVersion.map { it.split(".", "-").takeWhile { part -> part.toIntOrNull() != null }.take(2).joinToString(".") })
++    versionFamily(paperweight.minecraftVersion.map {
++        it.split(".", "-").takeWhile { part -> part.toIntOrNull() != null }.take(2).joinToString(".")
++    })
+     version(paperweight.minecraftVersion)
+ 
+     build {
