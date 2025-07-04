@@ -8,26 +8,12 @@
          upstream.patchRepo("paperServer") {
              upstreamRepo = purpur.patchedRepo("paperServer")
              patchesDir = rootDirectory.dir("divinemc-server/paper-patches")
-@@ -50,15 +_,49 @@
-         }
-         upstream.patchDir("purpurServer") {
-             upstreamPath = "purpur-server"
--            excludes = setOf("src/minecraft", "paper-patches", "minecraft-patches", "build.gradle.kts", "build.gradle.kts.patch")
-+            excludes = setOf(
-+                "src/minecraft",
-+                "paper-patches",
-+                "minecraft-patches",
-+                "build.gradle.kts",
-+                "build.gradle.kts.patch"
-+            )
-             patchesDir = rootDirectory.dir("divinemc-server/purpur-patches")
-             outputDir = rootDirectory.dir("purpur-server")
+@@ -56,8 +_,35 @@
          }
      }
--
--    activeFork = divinemc
-     // DivineMC end - Rebrand
  
+-    activeFork = divinemc
+-    // DivineMC end - Rebrand
 +    // BasicLandMC start - Rebrand
 +    val basiclandmc = forks.register("basiclandmc") {
 +        forks = divinemc
@@ -57,10 +43,9 @@
 +
 +    activeFork = basiclandmc
 +    // BasicLandMC end - Rebrand
-+
+ 
      spigot {
          enabled = true
-         buildDataRef = "281ac0de7a76d808753ede97d11b034bc801b63d"
 @@ -93,6 +_,7 @@
      @get:Inject
      abstract val archiveOperations: ArchiveOperations
