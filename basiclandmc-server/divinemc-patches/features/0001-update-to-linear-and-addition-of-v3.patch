@@ -5,10 +5,10 @@ Subject: [PATCH] update-to-linear-and-addition-of-v3
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index ec1f579dcc142490317b4d7a991bc08513c0f691..b3c99441f440dfada696ae3d12e98a602acb72f8 100644
+index ed4da856d444ef0e3f35cae625f3dd79d56bfc97..3a147f921d49f7a3bfadc9cd5138578885aa87a9 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-@@ -648,7 +648,8 @@ public class DivineConfig {
+@@ -633,7 +633,8 @@ public class DivineConfig {
                  "The implementation of the linear region file format to use.",
                  "Valid values:",
                  " - V1: Basic and default linear implementation",
