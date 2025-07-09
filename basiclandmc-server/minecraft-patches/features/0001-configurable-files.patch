@@ -1,0 +1,62 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Wed, 9 Jul 2025 18:04:07 +0200
+Subject: [PATCH] configurable-files
+
+
+diff --git a/net/minecraft/server/players/PlayerList.java b/net/minecraft/server/players/PlayerList.java
+index 147535646319018ec5dfe42d12fdb19d9e1f7543..541613c16a68a8ad78424bb353183a273b1a92c3 100644
+--- a/net/minecraft/server/players/PlayerList.java
++++ b/net/minecraft/server/players/PlayerList.java
+@@ -101,10 +101,12 @@ import net.minecraft.world.scores.Team;
+ import org.slf4j.Logger;
+ 
+ public abstract class PlayerList {
+-    public static final File USERBANLIST_FILE = new File("banned-players.json");
+-    public static final File IPBANLIST_FILE = new File("banned-ips.json");
+-    public static final File OPLIST_FILE = new File("ops.json");
+-    public static final File WHITELIST_FILE = new File("whitelist.json");
++    // DivineMC - make not final start
++    public static File USERBANLIST_FILE = new File("banned-players.json");
++    public static File IPBANLIST_FILE = new File("banned-ips.json");
++    public static File OPLIST_FILE = new File("ops.json");
++    public static File WHITELIST_FILE = new File("whitelist.json");
++    // DivineMC - make not final end
+     public static final Component CHAT_FILTERED_FULL = Component.translatable("chat.filtered_full");
+     public static final Component DUPLICATE_LOGIN_DISCONNECT_MESSAGE = Component.translatable("multiplayer.disconnect.duplicate_login");
+     private static final Logger LOGGER = LogUtils.getLogger();
+@@ -113,10 +115,12 @@ public abstract class PlayerList {
+     private final MinecraftServer server;
+     public final List<ServerPlayer> players = new java.util.concurrent.CopyOnWriteArrayList(); // CraftBukkit - ArrayList -> CopyOnWriteArrayList: Iterator safety
+     private final Map<UUID, ServerPlayer> playersByUUID = Maps.newHashMap();
+-    private final UserBanList bans = new UserBanList(USERBANLIST_FILE);
+-    private final IpBanList ipBans = new IpBanList(IPBANLIST_FILE);
+-    private final ServerOpList ops = new ServerOpList(OPLIST_FILE);
+-    private final UserWhiteList whitelist = new UserWhiteList(WHITELIST_FILE);
++    // DivineMC - initialize in constructor start
++    private final UserBanList bans;
++    private final IpBanList ipBans;
++    private final ServerOpList ops;
++    private final UserWhiteList whitelist;
++    // DivineMC - initialize in constructor end
+     // CraftBukkit start
+     // private final Map<UUID, ServerStatsCounter> stats = Maps.newHashMap();
+     // private final Map<UUID, PlayerAdvancements> advancements = Maps.newHashMap();
+@@ -144,6 +148,17 @@ public abstract class PlayerList {
+         this.registries = registries;
+         this.maxPlayers = maxPlayers;
+         this.playerIo = playerIo;
++        // DivineMC - initialize in constructor to make configurable start
++        USERBANLIST_FILE = (File) server.options.valueOf("banned-players");
++        IPBANLIST_FILE = (File) server.options.valueOf("banned-ips");
++        OPLIST_FILE = (File) server.options.valueOf("ops");
++        WHITELIST_FILE = (File) server.options.valueOf("whitelist");
++
++        bans = new UserBanList(USERBANLIST_FILE);
++        ipBans = new IpBanList(IPBANLIST_FILE);
++        ops = new ServerOpList(OPLIST_FILE);
++        whitelist = new UserWhiteList(WHITELIST_FILE);
++        // DivineMC - initialize in constructor to make configurable end
+     }
+ 
+     abstract public void loadAndSaveFiles(); // Paper - fix converting txt to json file; moved from DedicatedPlayerList constructor
