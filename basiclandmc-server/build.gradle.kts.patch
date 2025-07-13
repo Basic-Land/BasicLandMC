@@ -93,7 +93,7 @@
  
      // DivineMC start - Dependencies
      implementation("org.yaml:snakeyaml:2.3")
-@@ -293,14 +_,14 @@
+@@ -294,14 +_,14 @@
          val experimental = rootProject.providers.gradleProperty("experimental").get() // DivineMC - Experimental flag
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",
