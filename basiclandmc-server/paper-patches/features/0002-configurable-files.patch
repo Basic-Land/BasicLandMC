@@ -18,10 +18,10 @@ index c8ffa712b09ee534cb35851a7fff43c355ff7551..26de4ffc884dfb58648739dfbe7516e0
                  .option(LineReader.Option.COMPLETE_IN_WORD, true);
          if (io.papermc.paper.configuration.GlobalConfiguration.get().console.enableBrigadierHighlighting) {
 diff --git a/src/main/java/org/bukkit/craftbukkit/Main.java b/src/main/java/org/bukkit/craftbukkit/Main.java
-index ff350b5744b586cad7c2f5e0a04770e76f039d39..dfa35a4abf18cd5e1b7a842af84ed0d1de116c06 100644
+index 1a3a5e8a9119af8ed9d13a61bc5dc7b3ee0b7a65..f589fc23411fcfffc942da245d7bfbbd654b0170 100644
 --- a/src/main/java/org/bukkit/craftbukkit/Main.java
 +++ b/src/main/java/org/bukkit/craftbukkit/Main.java
-@@ -186,6 +186,43 @@ public class Main {
+@@ -180,6 +180,43 @@ public class Main {
                      .ofType(File.class)
                      .defaultsTo(new File("extra"))
                      .describedAs("Directory");
