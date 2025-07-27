@@ -15,7 +15,7 @@ index ed4da856d444ef0e3f35cae625f3dd79d56bfc97..3a147f921d49f7a3bfadc9cd51385788
 -                " - V2: Introduces a grid-based compression scheme for better data management and flexibility (default)"));
 +                " - V2: Introduces a grid-based compression scheme for better data management and flexibility (default)",
 +                " - V3: Removes unused data from V2"));
- 
+
              linearFlushMaxThreads = getInt(ConfigCategory.MISC.key("region-format.flush-max-threads"), linearFlushMaxThreads,
                  "The maximum number of threads to use for flushing linear region files.",
 diff --git a/src/main/java/org/bxteam/divinemc/region/LinearBase.java b/src/main/java/org/bxteam/divinemc/region/LinearBase.java
@@ -73,7 +73,7 @@ index e5215938c382a5d54a1166e14f17b533301272c7..923869f4eb16dfa721728b6a721bf25f
 +++ b/src/main/java/org/bxteam/divinemc/region/LinearImplementation.java
 @@ -1,6 +1,18 @@
  package org.bxteam.divinemc.region;
- 
+
  public enum LinearImplementation {
 -    V1,
 -    V2
@@ -926,14 +926,14 @@ index 30a54e569c1923d53bc68e8ffbdb0a969a037b6c..3578310b11261a3d25c9c4020b8731fb
 @@ -30,9 +30,7 @@ public enum RegionFileFormat {
                  return LINEAR;
              }
- 
+
 -            default -> {
 -                throw new IllegalArgumentException("Unknown region file format: " + name);
 -            }
 +            default -> throw new IllegalArgumentException("Unknown region file format: " + name);
          }
      }
- 
+
 diff --git a/src/main/java/org/bxteam/divinemc/region/V2LinearBase.java b/src/main/java/org/bxteam/divinemc/region/V2LinearBase.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..98d04c595e0f2ed8154277d06359e0649d008f1b

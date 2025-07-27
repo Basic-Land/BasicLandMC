@@ -46,14 +46,6 @@
  
      spigot {
          enabled = true
-@@ -93,6 +_,7 @@
-     @get:Inject
-     abstract val archiveOperations: ArchiveOperations
- }
-+
- val services = objects.newInstance<Services>()
- 
- if (project.providers.gradleProperty("publishDevBundle").isPresent) {
 @@ -150,6 +_,10 @@
          java { srcDir("../purpur-server/src/main/java") }
          resources { srcDir("../purpur-server/src/main/resources") }
@@ -76,15 +68,7 @@
      }
  }
  val log4jPlugins = sourceSets.create("log4jPlugins") {
-@@ -175,6 +_,7 @@
- 
- // Configure mockito agent that is needed in newer java versions
- val mockitoAgent = configurations.register("mockitoAgent")
-+
- abstract class MockitoAgentProvider : CommandLineArgumentProvider {
-     @get:CompileClasspath
-     abstract val fileCollection: ConfigurableFileCollection
-@@ -185,12 +_,12 @@
+@@ -185,7 +_,7 @@
  }
  
  dependencies {
@@ -93,28 +77,10 @@
  
      // DivineMC start - Dependencies
      implementation("org.yaml:snakeyaml:2.3")
--    implementation ("me.carleslc.Simple-YAML:Simple-Yaml:1.8.4") {
--        exclude(group="org.yaml", module="snakeyaml")
-+    implementation("me.carleslc.Simple-YAML:Simple-Yaml:1.8.4") {
-+        exclude(group = "org.yaml", module = "snakeyaml")
-     }
-     implementation("net.objecthunter:exp4j:0.4.8")
-     implementation("org.agrona:agrona:2.0.1")
-@@ -255,7 +_,9 @@
-     testImplementation("org.junit.platform:junit-platform-suite-engine:1.12.2")
-     testImplementation("org.hamcrest:hamcrest:3.0") // DivineMC - Bump dependencies
-     testImplementation("org.mockito:mockito-core:5.16.1") // DivineMC - Bump dependencies
--    mockitoAgent("org.mockito:mockito-core:5.16.1") { isTransitive = false } // Configure mockito agent that is needed in newer java versions // DivineMC - Bump dependencies
-+    mockitoAgent("org.mockito:mockito-core:5.16.1") {
-+        isTransitive = false
-+    } // Configure mockito agent that is needed in newer java versions // DivineMC - Bump dependencies
-     testImplementation("org.ow2.asm:asm-tree:9.8")
-     testImplementation("org.junit-pioneer:junit-pioneer:2.3.0") // CartesianTest // DivineMC - Bump dependencies
- 
-@@ -296,14 +_,14 @@
+@@ -294,14 +_,14 @@
          val experimental = rootProject.providers.gradleProperty("experimental").get() // DivineMC - Experimental flag
          attributes(
-             "Main-Class" to "org.bukkit.craftbukkit.Main",
+             "Main-Class" to "net.minecraft.server.Main", // DivineMC - Rebrand
 -            "Implementation-Title" to "DivineMC", // DivineMC - Rebrand
 +            "Implementation-Title" to "BasiclandMC", // BasiclandMC - Rebrand
              "Implementation-Version" to implementationVersion,
@@ -131,24 +97,3 @@
              "Build-Number" to (build ?: ""),
              "Build-Time" to buildTime.toString(),
              "Git-Branch" to gitBranch,
-@@ -363,7 +_,8 @@
-     jvmArgumentProviders.add(provider)
- }
- 
--val generatedDir: java.nio.file.Path = layout.projectDirectory.dir("../paper-server/src/generated/java").asFile.toPath() // Purpur
-+val generatedDir: java.nio.file.Path =
-+    layout.projectDirectory.dir("../paper-server/src/generated/java").asFile.toPath() // Purpur
- idea {
-     module {
-         generatedSourceDirs.add(generatedDir.toFile())
-@@ -509,7 +_,9 @@
- 
- fill {
-     project("paper")
--    versionFamily(paperweight.minecraftVersion.map { it.split(".", "-").takeWhile { part -> part.toIntOrNull() != null }.take(2).joinToString(".") })
-+    versionFamily(paperweight.minecraftVersion.map {
-+        it.split(".", "-").takeWhile { part -> part.toIntOrNull() != null }.take(2).joinToString(".")
-+    })
-     version(paperweight.minecraftVersion)
- 
-     build {

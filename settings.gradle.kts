@@ -14,7 +14,7 @@ plugins {
 
 rootProject.name = "BasicLandMC"
 
-for (name in listOf("basiclandmc-api", "basiclandmc-server")) {
+for (name in listOf("basiclandmc-api", "basiclandmc-server", "shuttle")) {
     val projName = name.lowercase(Locale.ENGLISH)
     include(projName)
     findProject(":$projName")!!.projectDir = file(name)

@@ -1,0 +1,869 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Sun, 27 Jul 2025 19:06:43 +0200
+Subject: [PATCH] ah
+
+
+diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
+index e7378d6c572530e5bca1bdfcb1cb6199cfd84cd2..b08d71f18219b50df4db0620148bd754a2e450d9 100644
+--- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
++++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
+@@ -10,7 +10,7 @@ import org.apache.logging.log4j.Logger;
+ import org.bxteam.divinemc.config.annotations.Experimental;
+ import org.bxteam.divinemc.async.pathfinding.PathfindTaskRejectPolicy;
+ import org.bxteam.divinemc.region.EnumRegionFileExtension;
+-import org.bxteam.divinemc.region.type.LinearRegionFile;
++import org.bxteam.divinemc.region.linear.LinearRegionFile;
+ import org.bxteam.divinemc.async.AsyncJoinHandler;
+ import org.jetbrains.annotations.Nullable;
+ import org.simpleyaml.configuration.comments.CommentType;
+diff --git a/src/main/java/org/bxteam/divinemc/region/EnumRegionFileExtension.java b/src/main/java/org/bxteam/divinemc/region/EnumRegionFileExtension.java
+index 17eef9a64e2e2bb7e2310e5f01e2e9d62e01a88b..173aae6fbd933a4642ded5e241de93d65b4adb69 100644
+--- a/src/main/java/org/bxteam/divinemc/region/EnumRegionFileExtension.java
++++ b/src/main/java/org/bxteam/divinemc/region/EnumRegionFileExtension.java
+@@ -3,7 +3,7 @@ package org.bxteam.divinemc.region;
+ import net.minecraft.world.level.chunk.storage.RegionFile;
+ import org.bxteam.divinemc.config.DivineConfig;
+ import org.bxteam.divinemc.region.type.BufferedRegionFile;
+-import org.bxteam.divinemc.region.type.LinearRegionFile;
++import org.bxteam.divinemc.region.linear.LinearRegionFile;
+ import org.jetbrains.annotations.Nullable;
+ 
+ public enum EnumRegionFileExtension {
+diff --git a/src/main/java/org/bxteam/divinemc/region/linear/LinearBase.java b/src/main/java/org/bxteam/divinemc/region/linear/LinearBase.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..ce5bce68263e860a14ac417e49f3c8abe771196d
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/region/linear/LinearBase.java
+@@ -0,0 +1,43 @@
++package org.bxteam.divinemc.region.linear;
++
++import net.jpountz.lz4.LZ4Compressor;
++import net.jpountz.lz4.LZ4Factory;
++import net.jpountz.lz4.LZ4FastDecompressor;
++import org.apache.logging.log4j.Logger;
++import org.bxteam.divinemc.region.linear.versions.V1Linear;
++import org.bxteam.divinemc.region.linear.versions.V2Linear;
++import org.bxteam.divinemc.region.linear.versions.V3Linear;
++import org.bxteam.divinemc.region.linear.versions.Version;
++
++import java.nio.file.Path;
++
++public abstract class LinearBase implements Version {
++
++    protected static final Logger LOGGER = LinearRegionFile.LOGGER;
++    protected static final long SUPERBLOCK = LinearRegionFile.SUPERBLOCK;
++    protected final Path regionFilePath;
++    protected final byte[][] chunkCompressedBuffers = new byte[1024][];
++    protected final int[] chunkUncompressedSizes = new int[1024];
++    protected final long[] chunkTimestamps = new long[1024];
++    protected final LZ4Compressor compressor = LZ4Factory.fastestInstance().fastCompressor();
++    protected final LZ4FastDecompressor decompressor = LZ4Factory.fastestInstance().fastDecompressor();
++    protected final int compressionLevel;
++
++    public LinearBase(Path regionFilePath, int compressionLevel) {
++        this.regionFilePath = regionFilePath;
++        this.compressionLevel = compressionLevel;
++    }
++
++    protected static int currentTimestamp() {
++        return (int) (System.currentTimeMillis() / 1000L);
++    }
++
++    public static LinearBase getShared(byte version, Path regionFilePath, int compressionLevel) {
++        return switch (version) {
++            case 1, 2 -> new V1Linear(regionFilePath, compressionLevel);
++            case 3 -> new V2Linear(regionFilePath, compressionLevel);
++            case 4 -> new V3Linear(regionFilePath, compressionLevel);
++            default -> throw new RuntimeException("Invalid version: " + version + " file " + regionFilePath);
++        };
++    }
++}
+diff --git a/src/main/java/org/bxteam/divinemc/region/linear/LinearImplementation.java b/src/main/java/org/bxteam/divinemc/region/linear/LinearImplementation.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..aa3e4f0503f1f1c0d98d1fd2815b06901a504dc5
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/region/linear/LinearImplementation.java
+@@ -0,0 +1,18 @@
++package org.bxteam.divinemc.region.linear;
++
++public enum LinearImplementation {
++    V1(2),
++    V2(3),
++    V3(4),
++    ;
++
++    private final int version;
++
++    LinearImplementation(int i) {
++        this.version = i;
++    }
++
++    public byte version() {
++        return (byte) version;
++    }
++}
+diff --git a/src/main/java/org/bxteam/divinemc/region/type/LinearRegionFile.java b/src/main/java/org/bxteam/divinemc/region/linear/LinearRegionFile.java
+similarity index 87%
+rename from src/main/java/org/bxteam/divinemc/region/type/LinearRegionFile.java
+rename to src/main/java/org/bxteam/divinemc/region/linear/LinearRegionFile.java
+index 5b71ff5f24acd1fca7e37fede624a58c2c922652..780259093626c582b6e177f1e854fbb7c7db83ed 100644
+--- a/src/main/java/org/bxteam/divinemc/region/type/LinearRegionFile.java
++++ b/src/main/java/org/bxteam/divinemc/region/linear/LinearRegionFile.java
+@@ -1,4 +1,4 @@
+-package org.bxteam.divinemc.region.type;
++package org.bxteam.divinemc.region.linear;
+ 
+ import ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO;
+ import com.github.luben.zstd.ZstdInputStream;
+@@ -15,34 +15,33 @@ import net.openhft.hashing.LongHashFunction;
+ import org.apache.logging.log4j.LogManager;
+ import org.apache.logging.log4j.Logger;
+ import org.bxteam.divinemc.region.IRegionFile;
++import org.bxteam.divinemc.region.linear.versions.V1Linear;
++import org.bxteam.divinemc.region.linear.versions.V2Linear;
++import org.bxteam.divinemc.region.linear.versions.V3Linear;
+ import org.checkerframework.checker.nullness.qual.Nullable;
+ 
+-import java.io.BufferedOutputStream;
+-import java.io.ByteArrayInputStream;
+-import java.io.ByteArrayOutputStream;
+-import java.io.DataInputStream;
+-import java.io.DataOutputStream;
+-import java.io.File;
+-import java.io.FileOutputStream;
+-import java.io.IOException;
+-import java.io.InputStream;
++import java.io.*;
+ import java.nio.ByteBuffer;
+ import java.nio.file.Files;
+ import java.nio.file.Path;
+ import java.nio.file.StandardCopyOption;
+-import java.util.concurrent.TimeUnit;
+-import java.util.concurrent.locks.LockSupport;
++import java.util.concurrent.atomic.AtomicBoolean;
+ import java.util.concurrent.locks.ReentrantLock;
+ 
+ public class LinearRegionFile implements IRegionFile {
+-    private static final long SUPERBLOCK = 0xc3ff13183cca9d9aL;
+-    private static final byte VERSION = 3;
+-    private static final int HEADER_SIZE = 27;
+-    private static final int FOOTER_SIZE = 8;
+-    private static final Logger LOGGER = LogManager.getLogger(LinearRegionFile.class.getSimpleName());
+-    private static final Object saveLock = new Object();
+-
+-    public static final int MAX_CHUNK_SIZE = 500 * 1024 * 1024;
++    protected static final int MAX_CHUNK_SIZE = 500 * 1024 * 1024;
++    protected static final long SUPERBLOCK = 0xc3ff13183cca9d9aL;
++    protected static final Logger LOGGER = LogManager.getLogger(LinearRegionFile.class.getSimpleName());
++    private static final LinearRegionFileFlusher linearRegionFileFlusher = new LinearRegionFileFlusher();
++    private final AtomicBoolean markedToSave = new AtomicBoolean(false);
++    protected boolean closed = false;
++
++    protected final LZ4Compressor compressor = LZ4Factory.fastestInstance().fastCompressor();
++    protected final LZ4FastDecompressor decompressor = LZ4Factory.fastestInstance().fastDecompressor();
++    private final LinearBase linearBase;
++    private final Path regionFilePath;
++
++
+     public static int SAVE_THREAD_MAX_COUNT = 6;
+     public static int SAVE_DELAY_MS = 100;
+     public static boolean USE_VIRTUAL_THREAD = true;
+@@ -56,57 +55,25 @@ public class LinearRegionFile implements IRegionFile {
+     private final int[] bufferUncompressedSize = new int[1024];
+     private final long[] chunkTimestamps = new long[1024];
+     private final Object markedToSaveLock = new Object();
+-    private final LZ4Compressor compressor;
+-    private final LZ4FastDecompressor decompressor;
+-    private final int compressionLevel;
+-    private final Thread bindThread;
+     private final java.util.concurrent.atomic.AtomicInteger recalculateCount = new java.util.concurrent.atomic.AtomicInteger();
+ 
+     private byte[][] bucketBuffers;
+-    private boolean markedToSave = false;
+     private boolean close = false;
+     private int gridSize = 8;
+     private int bucketSize = 4;
+ 
+     public LinearRegionFile(RegionStorageInfo storageKey, Path directory, Path path, boolean dsync, int compressionLevel) throws IOException {
+-        this(storageKey, directory, path, RegionFileVersion.getCompressionFormat(), dsync, compressionLevel);
+-    }
+-
+-    public LinearRegionFile(RegionStorageInfo storageKey, Path path, Path directory, RegionFileVersion compressionFormat, boolean dsync, int compressionLevel) throws IOException {
+-        Runnable flushCheck = () -> {
+-            while (!close) {
+-                synchronized (saveLock) {
+-                    if (markedToSave && activeSaveThreads < SAVE_THREAD_MAX_COUNT) {
+-                        activeSaveThreads++;
+-                        Runnable flushOperation = () -> {
+-                            try {
+-                                flush();
+-                            } catch (IOException ex) {
+-                                LOGGER.error("Region file {} flush failed", this.regionFile.toAbsolutePath(), ex);
+-                            } finally {
+-                                synchronized (saveLock) {
+-                                    activeSaveThreads--;
+-                                }
+-                            }
+-                        };
++        this(storageKey, directory, path, RegionFileVersion.getCompressionFormat(), dsync, compressionLevel, LinearImplementation.V1);
++    }
+ 
+-                        Thread saveThread = USE_VIRTUAL_THREAD ?
+-                            Thread.ofVirtual().name("Linear IO - " + LinearRegionFile.this.hashCode()).unstarted(flushOperation) :
+-                            Thread.ofPlatform().name("Linear IO - " + LinearRegionFile.this.hashCode()).unstarted(flushOperation);
+-                        saveThread.setPriority(Thread.NORM_PRIORITY - 3);
+-                        saveThread.start();
+-                    }
+-                }
+-                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(SAVE_DELAY_MS));
+-            }
+-        };
+-        this.bindThread = USE_VIRTUAL_THREAD ? Thread.ofVirtual().unstarted(flushCheck) : Thread.ofPlatform().unstarted(flushCheck);
+-        this.bindThread.setName("Linear IO Schedule - " + this.hashCode());
+-        this.regionFile = path;
+-        this.compressionLevel = compressionLevel;
+-
+-        this.compressor = LZ4Factory.fastestInstance().fastCompressor();
+-        this.decompressor = LZ4Factory.fastestInstance().fastDecompressor();
++    public LinearRegionFile(RegionStorageInfo storageKey, Path path, Path directory, RegionFileVersion compressionFormat, boolean dsync, int compressionLevel, LinearImplementation linearImplementation) throws IOException {
++        this.regionFilePath = path;
++        switch (linearImplementation) {
++            case V1 -> linearBase = new V1Linear(path, compressionLevel);
++            case V2 -> linearBase = new V2Linear(path, compressionLevel);
++            case V3 -> linearBase = new V3Linear(path, compressionLevel);
++            case null, default -> throw new IllegalStateException("Unexpected value: " + linearImplementation);
++        }
+     }
+ 
+     public Path getRegionFile() {
+diff --git a/src/main/java/org/bxteam/divinemc/region/linear/LinearRegionFileFlusher.java b/src/main/java/org/bxteam/divinemc/region/linear/LinearRegionFileFlusher.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..34c645efe68ccef175b690dd4b34cdb1a5485d11
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/region/linear/LinearRegionFileFlusher.java
+@@ -0,0 +1,54 @@
++package org.bxteam.divinemc.region.linear;
++
++import com.google.common.util.concurrent.ThreadFactoryBuilder;
++import org.bxteam.divinemc.config.DivineConfig;
++
++import java.util.Queue;
++import java.util.concurrent.*;
++
++public class LinearRegionFileFlusher {
++    private final Queue<LinearRegionFile> savingQueue = new LinkedBlockingQueue<>();
++    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
++        new ThreadFactoryBuilder()
++            .setNameFormat("linear-flush-scheduler")
++            .build()
++    );
++    private final ExecutorService executor;
++
++    {
++        ThreadFactoryBuilder factory = new ThreadFactoryBuilder()
++            .setNameFormat("linear-flusher-%d");
++
++
++        if (DivineConfig.MiscCategory.linearUseVirtualThread) {
++            factory.setThreadFactory(Thread.ofVirtual().factory());
++        }
++
++        executor = Executors.newFixedThreadPool(
++            DivineConfig.MiscCategory.linearFlushMaxThreads,
++            factory.build()
++        );
++    }
++
++    public LinearRegionFileFlusher() {
++        scheduler.scheduleAtFixedRate(this::pollAndFlush, 0L, 10, TimeUnit.SECONDS);
++    }
++
++    public void scheduleSave(LinearRegionFile regionFile) {
++        if (savingQueue.contains(regionFile)) return;
++        savingQueue.add(regionFile);
++    }
++
++    private void pollAndFlush() {
++        while (!savingQueue.isEmpty()) {
++            LinearRegionFile regionFile = savingQueue.poll();
++            if (!regionFile.closed && regionFile.isMarkedToSave())
++                executor.execute(regionFile::flushWrapper);
++        }
++    }
++
++    public void shutdown() {
++        executor.shutdown();
++        scheduler.shutdown();
++    }
++}
+diff --git a/src/main/java/org/bxteam/divinemc/region/linear/V2LinearBase.java b/src/main/java/org/bxteam/divinemc/region/linear/V2LinearBase.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..634452d469feeb20a3d6395e3b8f104554a47c1b
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/region/linear/V2LinearBase.java
+@@ -0,0 +1,129 @@
++package org.bxteam.divinemc.region.linear;
++
++import com.github.luben.zstd.ZstdInputStream;
++import com.github.luben.zstd.ZstdOutputStream;
++
++import java.io.*;
++import java.nio.file.Path;
++
++public abstract class V2LinearBase extends LinearBase {
++    protected final int gridSizeDefault = 8;
++    protected int gridSize = gridSizeDefault;
++    protected int bucketSize = 4;
++    protected byte[][] bucketBuffers;
++
++    public V2LinearBase(Path regionFilePath, int compressionLevel) {
++        super(regionFilePath, compressionLevel);
++    }
++
++    protected byte[][] buildBuckets() throws IOException {
++        int bucketCount = gridSize * gridSize;
++        byte[][] buckets = new byte[bucketCount][];
++
++        for (int bx = 0; bx < gridSize; bx++) {
++            for (int bz = 0; bz < gridSize; bz++) {
++                int bucketIdx = bx * gridSize + bz;
++                if (bucketBuffers != null && bucketBuffers[bucketIdx] != null) {
++                    buckets[bucketIdx] = bucketBuffers[bucketIdx];
++                    continue;
++                }
++
++                try (ByteArrayOutputStream bucketBAOS = new ByteArrayOutputStream();
++                     ZstdOutputStream bucketZstdOut = new ZstdOutputStream(bucketBAOS, compressionLevel);
++                     DataOutputStream bucketDataOut = new DataOutputStream(bucketZstdOut)) {
++
++                    boolean hasData = false;
++                    int cellCount = 32 / gridSize;
++                    for (int cx = 0; cx < cellCount; cx++) {
++                        for (int cz = 0; cz < cellCount; cz++) {
++                            int chunkIndex = (bx * cellCount + cx) + (bz * cellCount + cz) * 32;
++                            if (chunkUncompressedSizes[chunkIndex] > 0) {
++                                hasData = true;
++                                byte[] chunkData = new byte[chunkUncompressedSizes[chunkIndex]];
++                                decompressor.decompress(chunkCompressedBuffers[chunkIndex], 0, chunkData, 0, chunkUncompressedSizes[chunkIndex]);
++                                bucketDataOut.writeInt(chunkData.length + 8);
++                                bucketDataOut.writeLong(chunkTimestamps[chunkIndex]);
++                                bucketDataOut.write(chunkData);
++                            } else {
++                                bucketDataOut.writeInt(0);
++                                bucketDataOut.writeLong(chunkTimestamps[chunkIndex]);
++                            }
++                        }
++                    }
++                    bucketDataOut.close();
++                    if (hasData) {
++                        buckets[bucketIdx] = bucketBAOS.toByteArray();
++                    }
++                }
++            }
++        }
++        return buckets;
++    }
++
++    /**
++     * Extracts chunk data from bucketBuffers and populates chunkCompressedBuffers, chunkUncompressedSizes,
++     * and chunkTimestamps arrays.
++     *
++     * @throws IOException if there's an error during decompression or reading the data
++     */
++    protected void extractChunksFromBuckets() throws IOException {
++        if (bucketBuffers == null) {
++            return;
++        }
++
++        // Reset chunk data arrays
++        for (int i = 0; i < 1024; i++) {
++            chunkCompressedBuffers[i] = null;
++            chunkUncompressedSizes[i] = 0;
++            chunkTimestamps[i] = 0;
++        }
++
++        int cellCount = 32 / gridSize;
++
++        for (int bx = 0; bx < gridSize; bx++) {
++            for (int bz = 0; bz < gridSize; bz++) {
++                int bucketIdx = bx * gridSize + bz;
++                byte[] bucketData = bucketBuffers[bucketIdx];
++
++                if (bucketData == null || bucketData.length == 0) {
++                    continue;
++                }
++
++                try (ByteArrayInputStream bucketBAIS = new ByteArrayInputStream(bucketData);
++                     ZstdInputStream bucketZstdIn = new ZstdInputStream(bucketBAIS);
++                     DataInputStream bucketDataIn = new DataInputStream(bucketZstdIn)) {
++
++                    for (int cx = 0; cx < cellCount; cx++) {
++                        for (int cz = 0; cz < cellCount; cz++) {
++                            int chunkIndex = (bx * cellCount + cx) + (bz * cellCount + cz) * 32;
++
++                            int dataSize = bucketDataIn.readInt();
++                            long timestamp = bucketDataIn.readLong();
++                            chunkTimestamps[chunkIndex] = timestamp;
++
++                            if (dataSize > 0) {
++                                // Real size is dataSize - 8 (timestamp size)
++                                int chunkSize = dataSize - 8;
++                                byte[] chunkData = new byte[chunkSize];
++                                bucketDataIn.readFully(chunkData);
++
++                                // Compress the chunk data using LZ4
++                                int maxCompressedSize = compressor.maxCompressedLength(chunkSize);
++                                byte[] compressedData = new byte[maxCompressedSize];
++                                int compressedSize = compressor.compress(chunkData, 0, chunkSize,
++                                    compressedData, 0, maxCompressedSize);
++
++                                // Trim the compressed data to actual size
++                                byte[] trimmedCompressedData = new byte[compressedSize];
++                                System.arraycopy(compressedData, 0, trimmedCompressedData, 0, compressedSize);
++
++                                chunkCompressedBuffers[chunkIndex] = trimmedCompressedData;
++                                chunkUncompressedSizes[chunkIndex] = chunkSize;
++                            }
++                        }
++                    }
++                }
++            }
++        }
++    }
++}
+diff --git a/src/main/java/org/bxteam/divinemc/region/linear/versions/V1Linear.java b/src/main/java/org/bxteam/divinemc/region/linear/versions/V1Linear.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..3676c21d9061d74b5e9719dd25a3cf7f93f98383
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/region/linear/versions/V1Linear.java
+@@ -0,0 +1,125 @@
++package org.bxteam.divinemc.region.linear.versions;
++
++import com.github.luben.zstd.ZstdInputStream;
++import com.github.luben.zstd.ZstdOutputStream;
++import org.bxteam.divinemc.region.linear.LinearBase;
++import org.bxteam.divinemc.region.linear.LinearImplementation;
++
++import java.io.*;
++import java.nio.ByteBuffer;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.StandardCopyOption;
++import java.util.ArrayList;
++
++public class V1Linear extends LinearBase {
++    public V1Linear(Path regionFilePath, int compressionLevel) {
++        super(regionFilePath, compressionLevel);
++    }
++
++    @Override
++    public LinearImplementation implementation() {
++        return LinearImplementation.V1;
++    }
++
++    @Override
++    public void parse(ByteBuffer buffer) throws IOException {
++        final int HEADER_SIZE = 32;
++        final int FOOTER_SIZE = 8;
++        buffer.position(buffer.position() + 11);
++
++        int dataCount = buffer.getInt();
++        long fileLength = regionFilePath.toFile().length();
++        if (fileLength != HEADER_SIZE + dataCount + FOOTER_SIZE) {
++            throw new IOException("Invalid file length: " + regionFilePath + " " + fileLength + " expected " + (HEADER_SIZE + dataCount + FOOTER_SIZE));
++        }
++
++        buffer.position(buffer.position() + 8);
++
++        byte[] rawCompressed = new byte[dataCount];
++        buffer.get(rawCompressed);
++
++        try (ByteArrayInputStream bais = new ByteArrayInputStream(rawCompressed);
++             ZstdInputStream zstdIn = new ZstdInputStream(bais)) {
++            ByteBuffer decompressedBuffer = ByteBuffer.wrap(zstdIn.readAllBytes());
++            int[] starts = new int[1024];
++            for (int i = 0; i < 1024; i++) {
++                starts[i] = decompressedBuffer.getInt();
++                decompressedBuffer.getInt();
++            }
++
++            for (int i = 0; i < 1024; i++) {
++                if (starts[i] > 0) {
++                    int size = starts[i];
++                    byte[] chunkData = new byte[size];
++                    decompressedBuffer.get(chunkData);
++
++                    int maxCompressedLength = compressor.maxCompressedLength(size);
++                    byte[] compressed = new byte[maxCompressedLength];
++                    int compressedLength = compressor.compress(chunkData, 0, size, compressed, 0, maxCompressedLength);
++                    byte[] finalCompressed = new byte[compressedLength];
++                    System.arraycopy(compressed, 0, finalCompressed, 0, compressedLength);
++
++                    chunkCompressedBuffers[i] = finalCompressed;
++                    chunkUncompressedSizes[i] = size;
++                    chunkTimestamps[i] = currentTimestamp();
++                }
++            }
++        }
++    }
++
++    @Override
++    public void flush() throws IOException {
++        long timestamp = currentTimestamp();
++        short chunkCount = 0;
++        File tempFile = new File(regionFilePath.toString() + ".tmp");
++
++        try (FileOutputStream fos = new FileOutputStream(tempFile);
++             ByteArrayOutputStream zstdBAOS = new ByteArrayOutputStream();
++             ZstdOutputStream zstdOut = new ZstdOutputStream(zstdBAOS, compressionLevel);
++             DataOutputStream zstdDataOut = new DataOutputStream(zstdOut);
++             DataOutputStream fileDataOut = new DataOutputStream(fos)) {
++
++            fileDataOut.writeLong(SUPERBLOCK);
++            fileDataOut.writeByte(version());
++            fileDataOut.writeLong(timestamp);
++            fileDataOut.writeByte(compressionLevel);
++
++            ArrayList<byte[]> decompressedChunks = new ArrayList<>(1024);
++            for (int i = 0; i < 1024; i++) {
++                if (chunkUncompressedSizes[i] != 0) {
++                    chunkCount++;
++                    byte[] decompressed = new byte[chunkUncompressedSizes[i]];
++                    decompressor.decompress(chunkCompressedBuffers[i], 0, decompressed, 0, chunkUncompressedSizes[i]);
++                    decompressedChunks.add(decompressed);
++                } else {
++                    decompressedChunks.add(null);
++                }
++            }
++
++            for (int i = 0; i < 1024; i++) {
++                zstdDataOut.writeInt(chunkUncompressedSizes[i]);
++                zstdDataOut.writeInt((int) chunkTimestamps[i]);
++            }
++
++            for (int i = 0; i < 1024; i++) {
++                if (decompressedChunks.get(i) != null) {
++                    zstdDataOut.write(decompressedChunks.get(i));
++                }
++            }
++            zstdDataOut.close();
++
++            fileDataOut.writeShort(chunkCount);
++            byte[] compressedZstdData = zstdBAOS.toByteArray();
++            fileDataOut.writeInt(compressedZstdData.length);
++            fileDataOut.writeLong(0);
++            fileDataOut.write(compressedZstdData);
++            fileDataOut.writeLong(SUPERBLOCK);
++
++            fileDataOut.flush();
++            fos.getFD().sync();
++            fos.getChannel().force(true);
++        }
++        Files.move(tempFile.toPath(), regionFilePath, StandardCopyOption.REPLACE_EXISTING);
++    }
++}
+diff --git a/src/main/java/org/bxteam/divinemc/region/linear/versions/V2Linear.java b/src/main/java/org/bxteam/divinemc/region/linear/versions/V2Linear.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..32f29a2a2f61c7c14f29d516dfa9e019062d049e
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/region/linear/versions/V2Linear.java
+@@ -0,0 +1,169 @@
++package org.bxteam.divinemc.region.linear.versions;
++
++import net.openhft.hashing.LongHashFunction;
++import org.bxteam.divinemc.region.linear.LinearImplementation;
++import org.bxteam.divinemc.region.linear.V2LinearBase;
++
++import java.io.DataOutputStream;
++import java.io.File;
++import java.io.FileOutputStream;
++import java.io.IOException;
++import java.nio.ByteBuffer;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.StandardCopyOption;
++
++public class V2Linear extends V2LinearBase {
++    public V2Linear(Path regionFilePath, int compressionLevel) {
++        super(regionFilePath, compressionLevel);
++    }
++
++    @Override
++    public LinearImplementation implementation() {
++        return LinearImplementation.V2;
++    }
++
++    @Override
++    public void parse(ByteBuffer buffer) throws IOException {
++        buffer.getLong();
++        gridSize = buffer.get();
++        if (!(gridSize == 1 || gridSize == 2 || gridSize == 4 || gridSize == 8 || gridSize == 16 || gridSize == 32)) {
++            throw new RuntimeException("Invalid grid size: " + gridSize + " file " + regionFilePath);
++        }
++        bucketSize = 32 / gridSize;
++
++        buffer.getInt();
++        buffer.getInt();
++
++        boolean[] chunkExistenceBitmap = deserializeExistenceBitmap(buffer);
++
++        while (true) {
++            byte featureNameLength = buffer.get();
++            if (featureNameLength == 0) break;
++            byte[] featureNameBytes = new byte[featureNameLength];
++            buffer.get(featureNameBytes);
++            String featureName = new String(featureNameBytes);
++            int featureValue = buffer.getInt();
++        }
++
++        int bucketCount = gridSize * gridSize;
++        int[] bucketSizes = new int[bucketCount];
++        byte[] bucketCompressionLevels = new byte[bucketCount];
++        long[] bucketHashes = new long[bucketCount];
++
++        for (int i = 0; i < bucketCount; i++) {
++            bucketSizes[i] = buffer.getInt();
++            bucketCompressionLevels[i] = buffer.get();
++            bucketHashes[i] = buffer.getLong();
++        }
++
++        bucketBuffers = new byte[bucketCount][];
++        for (int i = 0; i < bucketCount; i++) {
++            if (bucketSizes[i] > 0) {
++                bucketBuffers[i] = new byte[bucketSizes[i]];
++                buffer.get(bucketBuffers[i]);
++                long rawHash = LongHashFunction.xx().hashBytes(bucketBuffers[i]);
++                if (rawHash != bucketHashes[i]) {
++                    throw new IOException("Region file hash incorrect " + regionFilePath);
++                }
++            }
++        }
++
++        long footerSuperBlock = buffer.getLong();
++        if (footerSuperBlock != SUPERBLOCK) {
++            throw new IOException("Footer superblock invalid " + regionFilePath);
++        }
++    }
++
++    @Override
++    public void flush() throws IOException {
++        long timestamp = currentTimestamp();
++        File tempFile = new File(regionFilePath.toString() + ".tmp");
++
++        try (FileOutputStream fos = new FileOutputStream(tempFile);
++             DataOutputStream dataOut = new DataOutputStream(fos)) {
++
++            dataOut.writeLong(SUPERBLOCK);
++            dataOut.writeByte(version());
++            dataOut.writeLong(timestamp);
++            dataOut.writeByte(gridSize);
++
++            int[] regionCoords = parseRegionCoordinates(regionFilePath.getFileName().toString());
++            dataOut.writeInt(regionCoords[0]);
++            dataOut.writeInt(regionCoords[1]);
++
++            boolean[] chunkExistence = new boolean[1024];
++            for (int i = 0; i < 1024; i++) {
++                chunkExistence[i] = (chunkUncompressedSizes[i] > 0);
++            }
++            writeExistenceBitmap(dataOut, chunkExistence);
++
++            writeNBTFeatures(dataOut);
++
++            byte[][] buckets = buildBuckets();
++
++            int bucketCount = gridSize * gridSize;
++            for (int i = 0; i < bucketCount; i++) {
++                dataOut.writeInt(buckets[i] != null ? buckets[i].length : 0);
++                dataOut.writeByte(compressionLevel);
++                long bucketHash = buckets[i] != null ? LongHashFunction.xx().hashBytes(buckets[i]) : 0;
++                dataOut.writeLong(bucketHash);
++            }
++            for (int i = 0; i < bucketCount; i++) {
++                if (buckets[i] != null) {
++                    dataOut.write(buckets[i]);
++                }
++            }
++            dataOut.writeLong(SUPERBLOCK);
++
++            dataOut.flush();
++            fos.getFD().sync();
++            fos.getChannel().force(true);
++        }
++        Files.move(tempFile.toPath(), regionFilePath, StandardCopyOption.REPLACE_EXISTING);
++    }
++
++    private boolean[] deserializeExistenceBitmap(ByteBuffer buffer) {
++        boolean[] result = new boolean[1024];
++        for (int i = 0; i < 128; i++) {
++            byte b = buffer.get();
++            for (int j = 0; j < 8; j++) {
++                result[i * 8 + j] = ((b >> (7 - j)) & 1) == 1;
++            }
++        }
++        return result;
++    }
++
++    private void writeExistenceBitmap(DataOutputStream out, boolean[] bitmap) throws IOException {
++        for (int i = 0; i < 128; i++) {
++            byte b = 0;
++            for (int j = 0; j < 8; j++) {
++                if (bitmap[i * 8 + j]) {
++                    b |= (1 << (7 - j));
++                }
++            }
++            out.writeByte(b);
++        }
++    }
++
++    private void writeNBTFeatures(DataOutputStream dataOut) throws IOException {
++        dataOut.writeByte(0);
++    }
++
++    protected int[] parseRegionCoordinates(String fileName) {
++        int regionX = 0;
++        int regionZ = 0;
++        String[] parts = fileName.split("\\.");
++        if (parts.length >= 4) {
++            try {
++                regionX = Integer.parseInt(parts[1]);
++                regionZ = Integer.parseInt(parts[2]);
++            } catch (NumberFormatException e) {
++                LOGGER.error("Failed to parse region coordinates from file name: {}", fileName, e);
++            }
++        } else {
++            LOGGER.warn("Unexpected file name format: {}", fileName);
++        }
++        return new int[]{regionX, regionZ};
++    }
++}
+diff --git a/src/main/java/org/bxteam/divinemc/region/linear/versions/V3Linear.java b/src/main/java/org/bxteam/divinemc/region/linear/versions/V3Linear.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..5e69d74b8746da507bb66b9fb113c012d622b087
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/region/linear/versions/V3Linear.java
+@@ -0,0 +1,98 @@
++package org.bxteam.divinemc.region.linear.versions;
++
++import net.openhft.hashing.LongHashFunction;
++import org.bxteam.divinemc.region.linear.LinearImplementation;
++import org.bxteam.divinemc.region.linear.V2LinearBase;
++
++import java.io.DataOutputStream;
++import java.io.File;
++import java.io.FileOutputStream;
++import java.io.IOException;
++import java.nio.ByteBuffer;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.StandardCopyOption;
++
++public class V3Linear extends V2LinearBase {
++    public V3Linear(Path regionFilePath, int compressionLevel) {
++        super(regionFilePath, compressionLevel);
++    }
++
++    @Override
++    public LinearImplementation implementation() {
++        return LinearImplementation.V3;
++    }
++
++    @Override
++    public byte version() {
++        return implementation().version();
++    }
++
++    @Override
++    public void parse(ByteBuffer buffer) throws IOException {
++        gridSize = buffer.get();
++        if (!(gridSize == 1 || gridSize == 2 || gridSize == 4 || gridSize == 8 || gridSize == 16 || gridSize == 32)) {
++            throw new RuntimeException("Invalid grid size: " + gridSize + " file " + regionFilePath);
++        }
++        bucketSize = 32 / gridSize;
++
++        int bucketCount = gridSize * gridSize;
++        int[] bucketSizes = new int[bucketCount];
++        long[] bucketHashes = new long[bucketCount];
++
++        for (int i = 0; i < bucketCount; i++) {
++            bucketSizes[i] = buffer.getInt();
++            bucketHashes[i] = buffer.getLong();
++        }
++
++        bucketBuffers = new byte[bucketCount][];
++        for (int i = 0; i < bucketCount; i++) {
++            if (bucketSizes[i] > 0) {
++                bucketBuffers[i] = new byte[bucketSizes[i]];
++                buffer.get(bucketBuffers[i]);
++                long rawHash = LongHashFunction.xx().hashBytes(bucketBuffers[i]);
++                if (rawHash != bucketHashes[i]) {
++                    throw new IOException("Region file hash incorrect " + regionFilePath);
++                }
++            }
++        }
++
++        long footerSuperBlock = buffer.getLong();
++        if (footerSuperBlock != SUPERBLOCK) {
++            throw new IOException("Footer superblock invalid " + regionFilePath);
++        }
++    }
++
++    @Override
++    public void flush() throws IOException {
++        File tempFile = new File(regionFilePath.toString() + ".tmp");
++
++        try (FileOutputStream fos = new FileOutputStream(tempFile);
++             DataOutputStream dataOut = new DataOutputStream(fos)) {
++
++            dataOut.writeLong(SUPERBLOCK);
++            dataOut.writeByte(version());
++            dataOut.writeByte(gridSize);
++
++            byte[][] buckets = buildBuckets();
++
++            int bucketCount = gridSize * gridSize;
++            for (int i = 0; i < bucketCount; i++) {
++                dataOut.writeInt(buckets[i] != null ? buckets[i].length : 0);
++                long bucketHash = buckets[i] != null ? LongHashFunction.xx().hashBytes(buckets[i]) : 0;
++                dataOut.writeLong(bucketHash);
++            }
++            for (int i = 0; i < bucketCount; i++) {
++                if (buckets[i] != null) {
++                    dataOut.write(buckets[i]);
++                }
++            }
++            dataOut.writeLong(SUPERBLOCK);
++
++            dataOut.flush();
++            fos.getFD().sync();
++            fos.getChannel().force(true);
++        }
++        Files.move(tempFile.toPath(), regionFilePath, StandardCopyOption.REPLACE_EXISTING);
++    }
++}
+diff --git a/src/main/java/org/bxteam/divinemc/region/linear/versions/Version.java b/src/main/java/org/bxteam/divinemc/region/linear/versions/Version.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..0698a826649445133c83314d077b69110081aa98
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/region/linear/versions/Version.java
+@@ -0,0 +1,19 @@
++package org.bxteam.divinemc.region.linear.versions;
++
++import org.bxteam.divinemc.region.linear.LinearImplementation;
++
++import java.io.IOException;
++import java.nio.ByteBuffer;
++
++public interface Version {
++    LinearImplementation implementation();
++
++    default byte version() {
++        return implementation().version();
++    }
++
++    void parse(ByteBuffer byteBuffer) throws IOException;
++
++    void flush() throws IOException;
++
++}

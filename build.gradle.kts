@@ -1,5 +1,6 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
+import kotlin.system.measureTimeMillis
 
 plugins {
     java
@@ -7,7 +8,6 @@ plugins {
 }
 
 val paperMavenPublicUrl = "https://repo.papermc.io/repository/maven-public/"
-val jitpackMavenUrl = "https://jitpack.io"
 
 paperweight {
     upstreams.register("divinemc") {
@@ -74,16 +74,6 @@ subprojects {
         }
     }
 
-    repositories {
-        mavenCentral()
-        maven(jitpackMavenUrl)
-        maven(paperMavenPublicUrl)
-    }
-
-    tasks.withType<AbstractArchiveTask>().configureEach {
-        isPreserveFileTimestamps = false
-        isReproducibleFileOrder = true
-    }
     tasks.withType<JavaCompile> {
         options.encoding = Charsets.UTF_8.name()
         options.release = 21
@@ -103,6 +93,13 @@ subprojects {
         }
     }
 
+    repositories {
+        mavenCentral()
+        maven(paperMavenPublicUrl)
+        maven("https://jitpack.io")
+        maven("https://s01.oss.sonatype.org/content/repositories/snapshots")
+    }
+
     extensions.configure<PublishingExtension> {
         repositories {
             maven("http://nexus.basicland.cz:8081/repository/dev-snapshots/") {
@@ -113,3 +110,80 @@ subprojects {
         }
     }
 }
+
+tasks.register<Jar>("createMojmapShuttleJar") {
+    dependsOn(":basiclandmc-server:createMojmapPaperclipJar", "shuttle:shadowJar")
+
+    outputs.upToDateWhen { false }
+
+    val paperclipJarTask = project(":basiclandmc-server").tasks.getByName("createMojmapPaperclipJar")
+    val shuttleJarTask = project(":shuttle").tasks.getByName("shadowJar")
+
+    val paperclipJar = paperclipJarTask.outputs.files.singleFile
+    val shuttleJar = shuttleJarTask.outputs.files.singleFile
+    val outputDir = paperclipJar.parentFile
+    val tempDir = File(outputDir, "tempJarWork")
+    val newJarName = "basiclandmc-shuttle-${properties["version"]}-mojmap.jar"
+
+    doFirst {
+        val time = measureTimeMillis {
+            println("Recompiling Paperclip with Shuttle sources...")
+
+            tempDir.deleteRecursively()
+            tempDir.mkdirs()
+
+            copy {
+                from(zipTree(paperclipJar))
+                into(tempDir)
+            }
+
+            val oldPackagePath = "io/papermc/paperclip/"
+            tempDir.walkTopDown()
+                .filter { it.isFile && it.relativeTo(tempDir).path.startsWith(oldPackagePath) }
+                .forEach { it.delete() }
+
+            val shuttlePackagePath = "org/bxteam/shuttle/"
+            copy {
+                from(zipTree(shuttleJar))
+                include("$shuttlePackagePath**")
+                into(tempDir)
+            }
+
+            tempDir.walkBottomUp()
+                .filter { it.isDirectory && it.listFiles().isNullOrEmpty() }
+                .forEach { it.delete() }
+
+            val metaInfDir = File(tempDir, "META-INF")
+            metaInfDir.mkdirs()
+            File(metaInfDir, "main-class").writeText("net.minecraft.server.Main")
+        }
+        println("Finished build in ${time}ms")
+    }
+
+    archiveFileName.set(newJarName)
+    destinationDirectory.set(outputDir)
+    from(tempDir)
+
+    manifest {
+        attributes(
+            "Main-Class" to "org.bxteam.shuttle.Shuttle",
+            "Enable-Native-Access" to "ALL-UNNAMED",
+            "Premain-Class" to "org.bxteam.shuttle.patch.InstrumentationManager",
+            "Agent-Class" to "org.bxteam.shuttle.patch.InstrumentationManager",
+            "Launcher-Agent-Class" to "org.bxteam.shuttle.patch.InstrumentationManager",
+            "Can-Redefine-Classes" to true,
+            "Can-Retransform-Classes" to true
+        )
+    }
+
+    doLast {
+        tempDir.deleteRecursively()
+    }
+}
+
+tasks.register("printMinecraftVersion") {
+    doLast {
+        println(providers.gradleProperty("mcVersion").get().trim())
+    }
+}
+
