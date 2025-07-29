@@ -1,6 +1,6 @@
 --- a/net/minecraft/network/Connection.java
 +++ b/net/minecraft/network/Connection.java
-@@ -198,7 +_,7 @@
+@@ -199,7 +_,7 @@
              if (this.channel.isOpen()) {
                  net.minecraft.server.level.ServerPlayer player = this.getPlayer(); // Paper - Add API for quit reason
                  if (exception instanceof TimeoutException) {

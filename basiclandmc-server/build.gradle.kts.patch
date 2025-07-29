@@ -77,7 +77,7 @@
  
      // DivineMC start - Dependencies
      implementation("org.yaml:snakeyaml:2.3")
-@@ -294,14 +_,14 @@
+@@ -287,14 +_,14 @@
          val experimental = rootProject.providers.gradleProperty("experimental").get() // DivineMC - Experimental flag
          attributes(
              "Main-Class" to "net.minecraft.server.Main", // DivineMC - Rebrand
