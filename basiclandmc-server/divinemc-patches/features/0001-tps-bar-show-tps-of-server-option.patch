@@ -5,10 +5,10 @@ Subject: [PATCH] tps-bar-show-tps-of-server-option
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index 1edea088a52655a5e719c019dbf4ff14212eb251..6687407872ebaac807afecf60eb1dc3747dd776c 100644
+index 592c5891844ac87b6d6aa498db39ba5ae9567a60..be89f78b5f4af6d472207fca5db1e3bb9e64d14c 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-@@ -193,6 +193,7 @@ public class DivineConfig {
+@@ -194,6 +194,7 @@ public class DivineConfig {
          public static boolean disableHardThrow = false;
          public static boolean pwtCompatabilityMode = false;
          public static boolean usePerWorldTpsBar = true;
@@ -16,7 +16,7 @@ index 1edea088a52655a5e719c019dbf4ff14212eb251..6687407872ebaac807afecf60eb1dc37
  
          // Regionized chunk ticking
          @Experimental("Regionized Chunk Ticking")
-@@ -248,6 +249,10 @@ public class DivineConfig {
+@@ -249,6 +250,10 @@ public class DivineConfig {
                  "Enables compatibility mode for plugins that are not compatible with Parallel World Ticking. This makes all async tasks run synchronously.");
              usePerWorldTpsBar = getBoolean(ConfigCategory.ASYNC.key("parallel-world-ticking.use-per-world-tps-bar"), usePerWorldTpsBar,
                  "Enables per-world TPS bar, which shows the TPS of the world the player is currently in. TPS bar can be turned on/off with /tpsbar command.");

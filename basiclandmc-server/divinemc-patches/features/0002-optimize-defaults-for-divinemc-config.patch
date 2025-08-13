@@ -5,10 +5,10 @@ Subject: [PATCH] optimize-defaults-for-divinemc-config
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index 6687407872ebaac807afecf60eb1dc3747dd776c..618392d3f293b57ab512f02bd61abc5412f0bf1d 100644
+index be89f78b5f4af6d472207fca5db1e3bb9e64d14c..3b2f71eaee4f18ad84a47610c866898208d125bc 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-@@ -187,8 +187,8 @@ public class DivineConfig {
+@@ -188,8 +188,8 @@ public class DivineConfig {
      public static class AsyncCategory {
          // Parallel world ticking settings
          @Experimental("Parallel World Ticking")
@@ -19,7 +19,7 @@ index 6687407872ebaac807afecf60eb1dc3747dd776c..618392d3f293b57ab512f02bd61abc54
          public static boolean logContainerCreationStacktraces = false;
          public static boolean disableHardThrow = false;
          public static boolean pwtCompatabilityMode = false;
-@@ -197,13 +197,13 @@ public class DivineConfig {
+@@ -198,13 +198,13 @@ public class DivineConfig {
  
          // Regionized chunk ticking
          @Experimental("Regionized Chunk Ticking")
@@ -36,9 +36,9 @@ index 6687407872ebaac807afecf60eb1dc3747dd776c..618392d3f293b57ab512f02bd61abc54
          public static int asyncPathfindingKeepalive = 60;
          public static int asyncPathfindingQueueSize = 0;
          public static PathfindTaskRejectPolicy asyncPathfindingRejectPolicy = PathfindTaskRejectPolicy.FLUSH_ALL;
-@@ -386,15 +386,16 @@ public class DivineConfig {
-         public static boolean dabDontEnableIfInWater = false;
-         public static List<String> dabBlackedEntities = new ArrayList<>();
+@@ -393,15 +393,16 @@ public class DivineConfig {
+             "goat"
+         ));
  
 -        // Virtual threads
 -        public static boolean virtualThreadsEnabled = false;
@@ -62,7 +62,7 @@ index 6687407872ebaac807afecf60eb1dc3747dd776c..618392d3f293b57ab512f02bd61abc54
  
          public static void load() {
              chunkSettings();
-@@ -777,7 +778,7 @@ public class DivineConfig {
+@@ -784,7 +785,7 @@ public class DivineConfig {
          public static int playerProfileResultCachingTimeout = 1440;
  
          // No chat reports
@@ -71,7 +71,7 @@ index 6687407872ebaac807afecf60eb1dc3747dd776c..618392d3f293b57ab512f02bd61abc54
          public static boolean noChatReportsAddQueryData = true;
          public static boolean noChatReportsConvertToGameMessage = true;
          public static boolean noChatReportsDebugLog = false;
-@@ -788,9 +789,9 @@ public class DivineConfig {
+@@ -795,9 +796,9 @@ public class DivineConfig {
          public static boolean protocolsAppleSkinEnabled = false;
          public static int protocolsAppleSkinSyncTickInterval = 20;
          public static boolean protocolsJadeEnabled = false;
