@@ -3,6 +3,8 @@ plugins {
     id("asp.publishing-conventions")
 }
 
+group = "com.infernalsuite.asp"
+
 dependencies {
     api(libs.annotations)
     api(libs.adventure.nbt)

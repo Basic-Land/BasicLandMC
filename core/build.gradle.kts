@@ -4,6 +4,8 @@ plugins {
     id("asp.publishing-conventions")
 }
 
+group = "com.infernalsuite.asp"
+
 dependencies {
     compileOnly(project(":api"))
     compileOnly(paperApi())
