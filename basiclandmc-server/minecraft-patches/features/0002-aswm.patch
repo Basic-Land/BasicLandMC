@@ -1,0 +1,293 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Sun, 31 Aug 2025 13:48:32 +0200
+Subject: [PATCH] aswm
+
+
+diff --git a/ca/spottedleaf/moonrise/paper/PaperHooks.java b/ca/spottedleaf/moonrise/paper/PaperHooks.java
+index 4b940c79f9acc415f131a472b03dac1296f83c4a..0240a9744b5947ccec429e9d730e104d8061b697 100644
+--- a/ca/spottedleaf/moonrise/paper/PaperHooks.java
++++ b/ca/spottedleaf/moonrise/paper/PaperHooks.java
+@@ -206,6 +206,7 @@ public class PaperHooks extends BaseChunkSystemHooks implements PlatformHooks {
+ 
+     @Override
+     public boolean forceNoSave(final ChunkAccess chunk) {
++        if(chunk instanceof LevelChunk levelChunk && levelChunk.level instanceof com.infernalsuite.asp.level.SlimeLevelInstance) return true; //ASP - prevent normal saving
+         return chunk instanceof LevelChunk levelChunk && levelChunk.mustNotSave;
+     }
+ 
+@@ -290,4 +291,4 @@ public class PaperHooks extends BaseChunkSystemHooks implements PlatformHooks {
+     public boolean addTicketForEnderPearls(final ServerLevel world) {
+         return !world.paperConfig().misc.legacyEnderPearlBehavior;
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
+index 8b3b3a881e7e39557fdba37802973b9d644b0d54..95db943e8dbf2e0d6124687e514a6b4a0283f890 100644
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
+@@ -202,7 +202,9 @@ public final class ChunkHolderManager {
+         };
+     }
+ 
+-    public void close(final boolean save, final boolean halt) {
++    public void close(boolean save, boolean halt) { // ASP
++        if (this.world instanceof com.infernalsuite.asp.level.SlimeLevelInstance) save = false; // ASP
++
+         TickThread.ensureTickThread("Closing world off-main");
+         if (halt) {
+             LOGGER.info("Waiting 60s for chunk system to halt for world '" + WorldUtil.getWorldName(this.world) + "'");
+diff --git a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/NewChunkHolder.java b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/NewChunkHolder.java
+index affa0dac8633ce3a43c9609888ed96d0aabdab5e..e1a08667427634ca246187f02a6ab3f5325078a6 100644
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/NewChunkHolder.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/NewChunkHolder.java
+@@ -926,13 +926,23 @@ public final class NewChunkHolder {
+             }
+ 
+             if (chunk instanceof LevelChunk levelChunk) {
++                //ASP start - unloadStage1 sets the entitySlices to null, so we can't get them otherwise unfortunately.
++                //This needs to be above world.unload since world.unload removes block entities
++                if (world instanceof com.infernalsuite.asp.level.SlimeLevelInstance instance) {
++                    instance.unload(levelChunk, entityChunk, poiChunk);
++                }
++                //ASP end
+                 this.world.unload(levelChunk);
+             }
+         }
+ 
+         // unload entity data
+         if (entityChunk != null) {
+-            this.saveEntities(entityChunk, true);
++            //ASP start - prevent saving
++            if (!(world instanceof com.infernalsuite.asp.level.SlimeLevelInstance)) {
++                this.saveEntities(entityChunk, true);
++            }
++            //ASP end - prevent saving
+             // yes this is a hack to pass the compound tag through...
+             final CompoundTag lastEntityUnload = this.lastEntityUnload;
+             this.lastEntityUnload = null;
+@@ -1746,6 +1756,12 @@ public final class NewChunkHolder {
+         boolean canSavePOI = !forceNoSaveChunk && (poi != null && poi.isDirty());
+         boolean canSaveEntities = entities != null;
+ 
++        //ASP start - prevent saving
++        if (world instanceof com.infernalsuite.asp.level.SlimeLevelInstance) {
++            canSaveEntities = false;
++        }
++        //ASP end - prevent saving
++
+         if (canSaveChunk) {
+             canSaveChunk = this.saveChunk(chunk, false);
+         }
+diff --git a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/task/ChunkLoadTask.java b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/task/ChunkLoadTask.java
+index 1440c9e2b106616884edcb20201113320817ed9f..bde0a9e2e2448903a16ff507c5441ebed8718c27 100644
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/task/ChunkLoadTask.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/task/ChunkLoadTask.java
+@@ -33,7 +33,7 @@ public final class ChunkLoadTask extends ChunkProgressionTask {
+     private static final Logger LOGGER = LoggerFactory.getLogger(ChunkLoadTask.class);
+ 
+     private final NewChunkHolder chunkHolder;
+-    private final ChunkDataLoadTask loadTask;
++    private final com.infernalsuite.asp.level.CommonLoadTask loadTask; // ASP
+ 
+     private volatile boolean cancelled;
+     private NewChunkHolder.GenericDataLoadTaskCallback entityLoadTask;
+@@ -45,11 +45,20 @@ public final class ChunkLoadTask extends ChunkProgressionTask {
+                          final NewChunkHolder chunkHolder, final Priority priority) {
+         super(scheduler, world, chunkX, chunkZ);
+         this.chunkHolder = chunkHolder;
+-        this.loadTask = new ChunkDataLoadTask(scheduler, world, chunkX, chunkZ, priority);
+-        this.loadTask.addCallback((final GenericDataLoadTask.TaskResult<ChunkAccess, Throwable> result) -> {
+-            ChunkLoadTask.this.loadResult = result; // must be before getAndDecrement
+-            ChunkLoadTask.this.tryCompleteLoad();
+-        });
++        // ASWM start
++        if (world instanceof com.infernalsuite.asp.level.SlimeLevelInstance levelInstance) {
++            this.loadTask = levelInstance.getLoadTask(this, scheduler, world, chunkX, chunkZ, priority, result -> {
++                ChunkLoadTask.this.loadResult = result; // must be before getAndDecrement
++                ChunkLoadTask.this.tryCompleteLoad();
++            });
++        } else {
++            this.loadTask = new ChunkDataLoadTask(scheduler, world, chunkX, chunkZ, priority);
++            ((ChunkDataLoadTask) this.loadTask).addCallback((final GenericDataLoadTask.TaskResult<ChunkAccess, Throwable> result) -> {
++                ChunkLoadTask.this.loadResult = result; // must be before getAndDecrement
++                ChunkLoadTask.this.tryCompleteLoad();
++            });
++        }
++        // ASWM end
+     }
+ 
+     private void tryCompleteLoad() {
+@@ -276,7 +285,7 @@ public final class ChunkLoadTask extends ChunkProgressionTask {
+ 
+     private static record ReadChunk(ProtoChunk protoChunk, SerializableChunkData chunkData) {}
+ 
+-    private static final class ChunkDataLoadTask extends CallbackDataLoadTask<ReadChunk, ChunkAccess> {
++    private static final class ChunkDataLoadTask extends CallbackDataLoadTask<ReadChunk, ChunkAccess> implements com.infernalsuite.asp.level.CommonLoadTask { // ASP
+         private ChunkDataLoadTask(final ChunkTaskScheduler scheduler, final ServerLevel world, final int chunkX,
+                                   final int chunkZ, final Priority priority) {
+             super(scheduler, world, chunkX, chunkZ, MoonriseRegionFileIO.RegionFileType.CHUNK_DATA, priority);
+diff --git a/net/minecraft/server/MinecraftServer.java b/net/minecraft/server/MinecraftServer.java
+index 5a9f957fa97ab40b623a47f123e42653ac61a792..76f815830852bd166835f60d0958c885a0bba333 100644
+--- a/net/minecraft/server/MinecraftServer.java
++++ b/net/minecraft/server/MinecraftServer.java
+@@ -516,18 +516,33 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+             if (levelStemKey == LevelStem.NETHER) {
+                 if (this.server.getAllowNether()) {
+                     dimension = -1;
++                    // ASP START
++                    if(com.infernalsuite.asp.SlimeNMSBridgeImpl.instance().loadNetherOverride()) {
++                        continue;
++                    }
++                    // ASP END
+                 } else {
+                     continue;
+                 }
+             } else if (levelStemKey == LevelStem.END) {
+                 if (this.server.getAllowEnd()) {
+                     dimension = 1;
++                    // ASP START
++                    if(com.infernalsuite.asp.SlimeNMSBridgeImpl.instance().loadEndOverride()) {
++                        continue;
++                    }
++                    // ASP END
+                 } else {
+                     continue;
+                 }
+             } else if (levelStemKey != LevelStem.OVERWORLD) {
+                 dimension = -999;
+             }
++            // ASP START
++            else if(levelStemKey == LevelStem.OVERWORLD && com.infernalsuite.asp.SlimeNMSBridgeImpl.instance().loadOverworldOverride()) {
++                continue;
++            }
++            // ASP END
+ 
+             // Migration of old CB world folders...
+             String worldType = (dimension == -999) ? levelStemKey.location().getNamespace() + "_" + levelStemKey.location().getPath() : org.bukkit.World.Environment.getEnvironment(dimension).toString().toLowerCase(Locale.ROOT);
+diff --git a/net/minecraft/server/level/ServerChunkCache.java b/net/minecraft/server/level/ServerChunkCache.java
+index b05fb5946564264771f998cff418513916eb6adb..65f4b8589fef64022d4a3636fc09c5b8e7beb13b 100644
+--- a/net/minecraft/server/level/ServerChunkCache.java
++++ b/net/minecraft/server/level/ServerChunkCache.java
+@@ -436,7 +436,13 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+             LOGGER.error("Failed to create dimension data storage directory", (Throwable)var15);
+         }
+ 
+-        this.dataStorage = new DimensionDataStorage(new SavedData.Context(level), path, fixerUpper, level.registryAccess());
++        //ASP start - No dimension data storage
++        if(level instanceof com.infernalsuite.asp.level.SlimeLevelInstance) {
++            this.dataStorage = new com.infernalsuite.asp.level.ReadOnlyDimensionDataStorage(new SavedData.Context(level), path, fixerUpper, level.registryAccess());
++        } else {
++            this.dataStorage = new DimensionDataStorage(new SavedData.Context(level), path, fixerUpper, level.registryAccess());
++        }
++        //ASP end - No dimension data storage
+         this.ticketStorage = this.dataStorage.computeIfAbsent(TicketStorage.TYPE);
+         this.chunkMap = new ChunkMap(
+             level,
+diff --git a/net/minecraft/server/level/ServerLevel.java b/net/minecraft/server/level/ServerLevel.java
+index 6eaa65eec584d317e8636a87bbb8ccb19f93c586..2c8d280391dbddafa9955c3b087eb7d60538516c 100644
+--- a/net/minecraft/server/level/ServerLevel.java
++++ b/net/minecraft/server/level/ServerLevel.java
+@@ -576,6 +576,8 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+     public final MinecraftServer.TickTimes tickTimes60s = new MinecraftServer.TickTimes(1200);
+     // DivineMC end - MSPT Tracking for each world
+ 
++    public com.infernalsuite.asp.level.SlimeInMemoryWorld slimeInstance; // ASP
++
+     public ServerLevel(
+         MinecraftServer server,
+         Executor dispatcher,
+@@ -593,11 +595,35 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+         org.bukkit.generator.ChunkGenerator gen, // CraftBukkit
+         org.bukkit.generator.BiomeProvider biomeProvider // CraftBukkit
+     ) {
++        //ASP start
++        this(null, server, dispatcher, levelStorageAccess, serverLevelData, dimension, levelStem, progressListener,
++            isDebug, biomeZoomSeed, customSpawners, tickTime, randomSequences, env, gen, biomeProvider);
++    }
++
++    public ServerLevel(
++        @Nullable com.infernalsuite.asp.level.SlimeBootstrap bootstrap,
++        MinecraftServer server,
++        Executor dispatcher,
++        LevelStorageSource.LevelStorageAccess levelStorageAccess,
++        net.minecraft.world.level.storage.PrimaryLevelData serverLevelData, // CraftBukkit
++        ResourceKey<Level> dimension,
++        LevelStem levelStem,
++        ChunkProgressListener progressListener,
++        boolean isDebug,
++        long biomeZoomSeed,
++        List<CustomSpawner> customSpawners,
++        boolean tickTime,
++        @Nullable RandomSequences randomSequences,
++        org.bukkit.World.Environment env, // CraftBukkit
++        org.bukkit.generator.ChunkGenerator gen, // CraftBukkit
++        org.bukkit.generator.BiomeProvider biomeProvider // CraftBukkit
++    ) {
++        //ASP end
+         // CraftBukkit start
+-        super(serverLevelData, dimension, server.registryAccess(), levelStem.type(), false, isDebug, biomeZoomSeed, server.getMaxChainedNeighborUpdates(), gen, biomeProvider, env, spigotConfig -> server.paperConfigurations.createWorldConfig(io.papermc.paper.configuration.PaperConfigurations.createWorldContextMap(levelStorageAccess.levelDirectory.path(), serverLevelData.getLevelName(), dimension.location(), spigotConfig, server.registryAccess(), serverLevelData.getGameRules())), dispatcher); // Paper - create paper world configs; Async-Anti-Xray: Pass executor
++        super(serverLevelData, dimension, server.registryAccess(), levelStem.type(), false, isDebug, biomeZoomSeed, server.getMaxChainedNeighborUpdates(), gen, biomeProvider, env, spigotConfig -> bootstrap != null ? com.infernalsuite.asp.config.SlimePaperWorldConfig.initializeOrGet() : server.paperConfigurations.createWorldConfig(io.papermc.paper.configuration.PaperConfigurations.createWorldContextMap(levelStorageAccess.levelDirectory.path(), serverLevelData.getLevelName(), dimension.location(), spigotConfig, server.registryAccess(), serverLevelData.getGameRules())), dispatcher); // Paper - create paper world configs; Async-Anti-Xray: Pass executor //ASP - Optimize world config
+         this.pvpMode = server.isPvpAllowed();
+         this.levelStorageAccess = levelStorageAccess;
+-        this.uuid = org.bukkit.craftbukkit.util.WorldUUID.getOrCreate(levelStorageAccess.levelDirectory.path().toFile());
++        this.uuid = bootstrap == null ? org.bukkit.craftbukkit.util.WorldUUID.getOrCreate(levelStorageAccess.levelDirectory.path().toFile()) : java.util.UUID.randomUUID(); //ASP - avoid IO calls
+         // CraftBukkit end
+         this.tickTime = tickTime;
+         this.server = server;
+@@ -638,6 +664,13 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+         }
+         // CraftBukkit end
+         su.plo.matter.Globals.setupGlobals(this); // DivineMC - Implement Secure Seed
++        // ASP START
++        ChunkGenerator result = this.getGenerator(bootstrap);
++        if (result != null) {
++            chunkGenerator = result;
++        }
++        // ASP END
++
+         boolean flag = server.forceSynchronousWrites();
+         DataFixer fixerUpper = server.getFixerUpper();
+         // Paper - rewrite chunk system
+@@ -680,7 +713,13 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+         );
+         this.structureManager = new StructureManager(this, this.serverLevelData.worldGenOptions(), this.structureCheck); // CraftBukkit
+         if (this.dimension() == Level.END && this.dimensionTypeRegistration().is(BuiltinDimensionTypes.END) || env == org.bukkit.World.Environment.THE_END) { // CraftBukkit - Allow to create EnderDragonBattle in default and custom END
+-            this.dragonFight = new EndDragonFight(this, this.serverLevelData.worldGenOptions().seed(), this.serverLevelData.endDragonFightData()); // CraftBukkit
++            // ASP START
++            if (bootstrap == null || bootstrap.initial().getPropertyMap().getValue(com.infernalsuite.asp.api.world.properties.SlimeProperties.DRAGON_BATTLE)) {
++                this.dragonFight = new EndDragonFight(this, this.serverLevelData.worldGenOptions().seed(), this.serverLevelData.endDragonFightData()); // CraftBukkit
++            } else {
++                this.dragonFight = new EndDragonFight(this, this.serverLevelData.worldGenOptions().seed(), new EndDragonFight.Data(false, true, true, false,Optional.empty(),Optional.empty(),Optional.empty())); // ASP - disable dragon
++            }
++            // ASP END
+         } else {
+             this.dragonFight = null;
+         }
+@@ -723,6 +762,12 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+         this.dragonFight = dragonFight;
+     }
+ 
++    // ASP START
++    public ChunkGenerator getGenerator(com.infernalsuite.asp.level.SlimeBootstrap bootstrap) {
++        return null;
++    }
++    // ASP END
++
+     public void setWeatherParameters(int clearTime, int weatherTime, boolean isRaining, boolean isThundering) {
+         this.serverLevelData.setClearWeatherTime(clearTime);
+         this.serverLevelData.setRainTime(weatherTime);
+diff --git a/net/minecraft/world/level/Level.java b/net/minecraft/world/level/Level.java
+index 0b7f9af0c4e43115878769043ebd06a09ccdf059..850b67929cdc8d1bf9f9de555b7ea1161e6c1f46 100644
+--- a/net/minecraft/world/level/Level.java
++++ b/net/minecraft/world/level/Level.java
+@@ -880,7 +880,7 @@ public abstract class Level implements LevelAccessor, UUIDLookup<Entity>, AutoCl
+         this.maxSectionY = this.maxY >> 4;
+         this.sectionsCount = this.maxSectionY - this.minSectionY + 1;
+         // Paper end - getblock optimisations - cache world height/sections
+-        this.spigotConfig = new org.spigotmc.SpigotWorldConfig(((net.minecraft.world.level.storage.PrimaryLevelData) levelData).getLevelName()); // Spigot
++        this.spigotConfig = new org.spigotmc.SpigotWorldConfig(((net.minecraft.world.level.storage.PrimaryLevelData) levelData).getLevelName(), !(this instanceof com.infernalsuite.asp.level.SlimeLevelInstance)); // Spigot //ASP - Improve Slime IO
+         this.paperConfig = paperWorldConfigCreator.apply(this.spigotConfig); // Paper - create paper world config
+         this.purpurConfig = new org.purpurmc.purpur.PurpurWorldConfig(((net.minecraft.world.level.storage.PrimaryLevelData) levelData).getLevelName(), environment); // Purpur - Purpur config files
+         // DivineMC start - Configuration

@@ -1,0 +1,99 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Sun, 31 Aug 2025 14:35:59 +0200
+Subject: [PATCH] aswm
+
+
+diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+index 8734f54497ad7c968342db332d40f4760ebd73ac..5d63c0995d2cf952d9d2cdc7aec8fce3345d8558 100644
+--- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+@@ -1478,6 +1478,8 @@ public final class CraftServer implements Server {
+             return false;
+         }
+ 
++        com.infernalsuite.asp.AdvancedSlimePaper.instance().onWorldUnload(world.getName()); // ASP - Remove unloaded world from map
++
+         try {
+             if (save) {
+                 handle.save(null, true, false); // Paper - Fix saving in unloadWorld
+@@ -1486,6 +1488,12 @@ public final class CraftServer implements Server {
+             handle.getChunkSource().close(save);
+             io.papermc.paper.FeatureHooks.closeEntityManager(handle, save); // SPIGOT-6722: close entityManager // Paper - chunk system
+             handle.levelStorageAccess.close();
++
++            //ASP start - avoid temp storage leak during runtime
++            if (handle instanceof com.infernalsuite.asp.level.SlimeLevelInstance asp) {
++                asp.deleteTempFiles();
++            }
++            //ASP end
+         } catch (Exception ex) {
+             this.getLogger().log(Level.SEVERE, null, ex);
+         }
+diff --git a/src/main/java/org/spigotmc/SpigotConfig.java b/src/main/java/org/spigotmc/SpigotConfig.java
+index ba539e6a37eba4bcee5061b6012829027102d740..0508a2acaca12f498957022dbc4201914ab16d2b 100644
+--- a/src/main/java/org/spigotmc/SpigotConfig.java
++++ b/src/main/java/org/spigotmc/SpigotConfig.java
+@@ -79,7 +79,13 @@ public class SpigotConfig {
+         }
+     }
+ 
++    // ASP start - Improve Slime IO
+     public static void readConfig(Class<?> clazz, Object instance) {
++        readConfig(clazz, instance, true);
++    }
++
++    public static void readConfig(Class<?> clazz, Object instance, boolean save) {
++        // ASP end - Improve Slime IO
+         for (Method method : clazz.getDeclaredMethods()) {
+             if (Modifier.isPrivate(method.getModifiers())) {
+                 if (method.getParameterTypes().length == 0 && method.getReturnType() == Void.TYPE) {
+@@ -96,7 +102,11 @@ public class SpigotConfig {
+         }
+ 
+         try {
+-            SpigotConfig.config.save(SpigotConfig.CONFIG_FILE);
++            // ASP start - Improve Slime IO
++            if (save) {
++                SpigotConfig.config.save(SpigotConfig.CONFIG_FILE);
++            }
++            // ASP end - Improve Slime IO
+         } catch (IOException ex) {
+             Bukkit.getLogger().log(Level.SEVERE, "Could not save " + SpigotConfig.CONFIG_FILE, ex);
+         }
+diff --git a/src/main/java/org/spigotmc/SpigotWorldConfig.java b/src/main/java/org/spigotmc/SpigotWorldConfig.java
+index 74cae42b0c8971e0ad724ef28a7ddb42906e574d..985c8196d578b5b77d6cc2ece3b31dc7245b8191 100644
+--- a/src/main/java/org/spigotmc/SpigotWorldConfig.java
++++ b/src/main/java/org/spigotmc/SpigotWorldConfig.java
+@@ -10,17 +10,29 @@ public class SpigotWorldConfig {
+     private final YamlConfiguration config;
+     private boolean verbose;
+ 
++    // ASP start - Improve Slime IO
+     public SpigotWorldConfig(String worldName) {
++        this(worldName, true);
++    }
++    // ASP end - Improve Slime IO
++
++    public SpigotWorldConfig(String worldName, boolean saveOnLoad) { // ASP - Improve Slime IO
+         this.worldName = worldName;
+         this.config = SpigotConfig.config;
+-        this.init();
++        this.init(saveOnLoad); // ASP - Improve Slime IO
+     }
+ 
++    // ASP start - Improve Slime IO
+     public void init() {
++        init(true);
++    }
++
++    public void init(boolean saveOnLoad) {
++        // ASP end - Improve Slime IO
+         this.verbose = this.getBoolean("verbose", false); // Paper
+ 
+         this.log("-------- World Settings For [" + this.worldName + "] --------");
+-        SpigotConfig.readConfig(SpigotWorldConfig.class, this);
++        SpigotConfig.readConfig(SpigotWorldConfig.class, this, saveOnLoad); // ASP - Improve Slime IO
+     }
+ 
+     private void log(String s) {

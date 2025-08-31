@@ -68,12 +68,13 @@
      }
  }
  val log4jPlugins = sourceSets.create("log4jPlugins") {
-@@ -185,7 +_,7 @@
+@@ -185,7 +_,8 @@
  }
  
  dependencies {
 -    implementation(project(":divinemc-api")) // DivineMC - Rebrand
 +    implementation(project(":basiclandmc-api")) // BasicLandMC - Rebrand
++    implementation(project(":core")) //ASP
  
      // DivineMC start - Dependencies
      implementation("org.yaml:snakeyaml:2.3")
