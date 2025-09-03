@@ -1,0 +1,151 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Wed, 3 Sep 2025 19:15:33 +0200
+Subject: [PATCH] test
+
+
+diff --git a/ca/spottedleaf/moonrise/patches/starlight/util/SaveUtil.java b/ca/spottedleaf/moonrise/patches/starlight/util/SaveUtil.java
+index f1f72a051083b61273202cb4e67ecb11f1aecc9d..12b5cf68ba04c92465c6b09bb00c33bbca1ee753 100644
+--- a/ca/spottedleaf/moonrise/patches/starlight/util/SaveUtil.java
++++ b/ca/spottedleaf/moonrise/patches/starlight/util/SaveUtil.java
+@@ -67,7 +67,7 @@ public final class SaveUtil {
+             if (sectionStored == null) {
+                 continue;
+             }
+-            int k = sectionStored.getByteOr("Y", (byte)0);
++            int k = sectionStored.getIntOr("Y", 0);
+ 
+             // strip light data
+             sectionStored.remove("BlockLight");
+@@ -86,7 +86,7 @@ public final class SaveUtil {
+                     CompoundTag section = sections[i - minSection];
+                     if (section == null) {
+                         section = new CompoundTag();
+-                        section.putByte("Y", (byte)i);
++                        section.putInt("Y", i);
+                         sections[i - minSection] = section;
+                     }
+ 
+@@ -161,7 +161,7 @@ public final class SaveUtil {
+                 if (sectionData == null) {
+                     continue;
+                 }
+-                int y = sectionData.getByteOr("Y", (byte)0);
++                int y = sectionData.getIntOr("Y", 0);
+ 
+                 final byte[] blockLight = sectionData.getByteArray("BlockLight").orElse(null);
+                 if (blockLight != null) {
+diff --git a/net/minecraft/core/BlockPos.java b/net/minecraft/core/BlockPos.java
+index 0dc73d76c2d86e05bedb3eb4f51d638c17390277..06ba9cc87c4cd0bc7038cd581a90f946c069642e 100644
+--- a/net/minecraft/core/BlockPos.java
++++ b/net/minecraft/core/BlockPos.java
+@@ -52,15 +52,15 @@ public class BlockPos extends Vec3i {
+     private static final Logger LOGGER = LogUtils.getLogger();
+     public static final BlockPos ZERO = new BlockPos(0, 0, 0);
+     // Paper start - Optimize Bit Operations by inlining
+-    public static final int PACKED_HORIZONTAL_LENGTH = 26;
+-    public static final int PACKED_Y_LENGTH = 12;
+-    private static final long PACKED_X_MASK = 67108863;
+-    private static final long PACKED_Y_MASK = 4095;
+-    private static final long PACKED_Z_MASK = 67108863;
++    public static final int PACKED_HORIZONTAL_LENGTH = 24;
++    public static final int PACKED_Y_LENGTH = 16;
++    private static final long PACKED_X_MASK = 16_777_215;
++    private static final long PACKED_Y_MASK = 65535;
++    private static final long PACKED_Z_MASK = 16_777_215;
+     private static final int Y_OFFSET = 0;
+-    private static final int Z_OFFSET = 12;
+-    private static final int X_OFFSET = 38;
+-    public static final int MAX_HORIZONTAL_COORDINATE = 33554431;
++    private static final int Z_OFFSET = 16;
++    private static final int X_OFFSET = 40;
++    public static final int MAX_HORIZONTAL_COORDINATE = 8_000_000;
+     // Paper end - Optimize Bit Operations by inlining
+ 
+     // Purpur start - Ridables
+@@ -83,23 +83,23 @@ public class BlockPos extends Vec3i {
+     }
+ 
+     public static long offset(long pos, int dx, int dy, int dz) {
+-        return asLong((int) (pos >> 38) + dx, (int) ((pos << 52) >> 52) + dy, (int) ((pos << 26) >> 38) + dz); // Paper - simplify/inline
++        return asLong((int) (pos >> 40) + dx, (int) ((pos << 48) >> 48) + dy, (int) ((pos << 24) >> 40) + dz); // Paper - simplify/inline
+     }
+ 
+     public static int getX(long packedPos) {
+-        return (int) (packedPos >> 38); // Paper - simplify/inline
++        return (int) (packedPos >> 40); // Paper - simplify/inline
+     }
+ 
+     public static int getY(long packedPos) {
+-        return (int) ((packedPos << 52) >> 52); // Paper - simplify/inline
++        return (int) ((packedPos << 48) >> 48); // Paper - simplify/inline
+     }
+ 
+     public static int getZ(long packedPos) {
+-        return (int) ((packedPos << 26) >> 38); // Paper - simplify/inline
++        return (int) ((packedPos << 24) >> 40); // Paper - simplify/inline
+     }
+ 
+     public static BlockPos of(long packedPos) {
+-        return new BlockPos((int) (packedPos >> 38), (int) ((packedPos << 52) >> 52), (int) ((packedPos << 26) >> 38)); // Paper - simplify/inline
++        return new BlockPos((int) (packedPos >> 40), (int) ((packedPos << 48) >> 48), (int) ((packedPos << 24) >> 40)); // Paper - simplify/inline
+     }
+ 
+     public static BlockPos containing(double x, double y, double z) {
+@@ -123,7 +123,7 @@ public class BlockPos extends Vec3i {
+     }
+ 
+     public static long asLong(int x, int y, int z) {
+-        return ((x & 67108863L) << 38) | ((y &  4095L)) | ((z & 67108863L) << 12); // Paper - inline constants and simplify
++        return ((x & 16777215L) << 40) | ((y &  65535L)) | ((z & 16777215L) << 16); // Paper - inline constants and simplify
+     }
+ 
+     public static long getFlatIndex(long packedPos) {
+diff --git a/net/minecraft/network/CompressionEncoder.java b/net/minecraft/network/CompressionEncoder.java
+index ea8a894158c44c2e7943dea43ecd8e1f0075b18f..801a9be1086e219a02d4e9848798f224111d614a 100644
+--- a/net/minecraft/network/CompressionEncoder.java
++++ b/net/minecraft/network/CompressionEncoder.java
+@@ -32,7 +32,7 @@ public class CompressionEncoder extends MessageToByteEncoder<ByteBuf> {
+     @Override
+     protected void encode(ChannelHandlerContext context, ByteBuf encodingByteBuf, ByteBuf byteBuf) throws Exception { // Paper - Use Velocity cipher
+         int i = encodingByteBuf.readableBytes();
+-        if (i > 8388608) {
++        if (false && i > 8388608) {
+             throw new IllegalArgumentException("Packet too big (is " + i + ", should be less than 8388608)");
+         } else {
+             if (i < this.threshold) {
+diff --git a/net/minecraft/network/PacketEncoder.java b/net/minecraft/network/PacketEncoder.java
+index 546bfd09c703a2cb7cb39d6ca3e503a4ad3d79cb..a947e854b68adbd2a19fd056e6686511e24d88b8 100644
+--- a/net/minecraft/network/PacketEncoder.java
++++ b/net/minecraft/network/PacketEncoder.java
+@@ -55,7 +55,7 @@ public class PacketEncoder<T extends PacketListener> extends MessageToByteEncode
+     // packet size is encoded into 3-byte varint
+     private static final int MAX_FINAL_PACKET_SIZE = (1 << 21) - 1;
+     // Vanilla Max size for the encoder (before compression)
+-    private static final int MAX_PACKET_SIZE = 8388608;
++    private static final int MAX_PACKET_SIZE = Integer.MAX_VALUE;
+ 
+     public static class PacketTooLargeException extends RuntimeException {
+         private final Packet<?> packet;
+diff --git a/net/minecraft/world/level/chunk/storage/SerializableChunkData.java b/net/minecraft/world/level/chunk/storage/SerializableChunkData.java
+index 87abba1241552fe967229f1b442cd0a767cbf739..dadf19a4b4a8583fff875f2c4616202756bb430f 100644
+--- a/net/minecraft/world/level/chunk/storage/SerializableChunkData.java
++++ b/net/minecraft/world/level/chunk/storage/SerializableChunkData.java
+@@ -216,7 +216,7 @@ public record SerializableChunkData(
+                 Optional<CompoundTag> compound = listOrEmpty2.getCompound(i2);
+                 if (!compound.isEmpty()) {
+                     CompoundTag compoundTag = compound.get(); final CompoundTag sectionData = compoundTag; // Paper - OBFHELPER
+-                    int byteOr = compoundTag.getByteOr("Y", (byte)0);
++                    int byteOr = compoundTag.getIntOr("Y", 0);
+                     LevelChunkSection levelChunkSection;
+                     if (byteOr >= levelHeightAccessor.getMinSectionY() && byteOr <= levelHeightAccessor.getMaxSectionY()) {
+                         final BlockState[] presetBlockStates = serverLevel.chunkPacketBlockController.getPresetBlockStates(serverLevel, chunkPos, byteOr); // Paper - Anti-Xray - Add preset block states
+@@ -653,7 +653,7 @@ public record SerializableChunkData(
+             // Paper end - starlight
+ 
+             if (!compoundTag1.isEmpty()) {
+-                compoundTag1.putByte("Y", (byte)sectionData.y);
++                compoundTag1.putInt("Y", sectionData.y);
+                 listTag.add(compoundTag1);
+             }
+         }
