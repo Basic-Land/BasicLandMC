@@ -5,7 +5,7 @@ Subject: [PATCH] optimize-defaults-for-divinemc-config
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index 69937318fcf7d02ad853e8c88c6747f161225701..fd9397ace0a0f4e1717f507829e7d783e0586ed4 100644
+index 2de78df409b2bcfc7750d3e3e9a740f4d97b0047..fd9397ace0a0f4e1717f507829e7d783e0586ed4 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 @@ -188,8 +188,8 @@ public class DivineConfig {
@@ -31,7 +31,7 @@ index 69937318fcf7d02ad853e8c88c6747f161225701..fd9397ace0a0f4e1717f507829e7d783
  
          // Async pathfinding settings
          public static boolean asyncPathfinding = true;
--        public static int asyncPathfindingMaxThreads = 2;
+-        public static int asyncPathfindingMaxThreads = 1;
 +        public static int asyncPathfindingMaxThreads = 1; // BasiclandMC optimize defaults
          public static int asyncPathfindingKeepalive = 60;
          public static int asyncPathfindingQueueSize = 0;
