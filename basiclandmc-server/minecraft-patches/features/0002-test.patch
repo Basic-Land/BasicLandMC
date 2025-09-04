@@ -127,6 +127,19 @@ index 546bfd09c703a2cb7cb39d6ca3e503a4ad3d79cb..a947e854b68adbd2a19fd056e6686511
  
      public static class PacketTooLargeException extends RuntimeException {
          private final Packet<?> packet;
+diff --git a/net/minecraft/network/Varint21LengthFieldPrepender.java b/net/minecraft/network/Varint21LengthFieldPrepender.java
+index 877ef8fc69b7903ae1ce35bfc7d0ea214bbe2d31..e7c400f2f02ab016c5855e7b2da28c2195c446fe 100644
+--- a/net/minecraft/network/Varint21LengthFieldPrepender.java
++++ b/net/minecraft/network/Varint21LengthFieldPrepender.java
+@@ -14,7 +14,7 @@ public class Varint21LengthFieldPrepender extends MessageToByteEncoder<ByteBuf>
+     protected void encode(ChannelHandlerContext context, ByteBuf encoder, ByteBuf decoder) {
+         int i = encoder.readableBytes();
+         int byteSize = VarInt.getByteSize(i);
+-        if (byteSize > 3) {
++        if (byteSize > 30) {
+             throw new EncoderException("Packet too large: size " + i + " is over 8");
+         } else {
+             decoder.ensureWritable(byteSize + i);
 diff --git a/net/minecraft/world/level/chunk/storage/SerializableChunkData.java b/net/minecraft/world/level/chunk/storage/SerializableChunkData.java
 index 87abba1241552fe967229f1b442cd0a767cbf739..dadf19a4b4a8583fff875f2c4616202756bb430f 100644
 --- a/net/minecraft/world/level/chunk/storage/SerializableChunkData.java
