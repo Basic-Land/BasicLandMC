@@ -5,7 +5,7 @@ Subject: [PATCH] optimize-defaults-for-divinemc-config
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index 9a2df9dbc99e9c036d36a40856dda5067eaea9a9..c6528bab0bf0939a400045558a3e0d33de5b92b9 100644
+index 4546be176c8d47ebd60d3d775b80b41e2768ad10..57dc423b349233234700c19afd42fe6008f77c45 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 @@ -188,8 +188,8 @@ public class DivineConfig {
@@ -36,7 +36,7 @@ index 9a2df9dbc99e9c036d36a40856dda5067eaea9a9..c6528bab0bf0939a400045558a3e0d33
          public static int asyncPathfindingKeepalive = 60;
          public static int asyncPathfindingQueueSize = 0;
          public static PathfindTaskRejectPolicy asyncPathfindingRejectPolicy = PathfindTaskRejectPolicy.FLUSH_ALL;
-@@ -403,15 +403,16 @@ public class DivineConfig {
+@@ -401,15 +401,16 @@ public class DivineConfig {
              "goat"
          ));
  
@@ -62,7 +62,7 @@ index 9a2df9dbc99e9c036d36a40856dda5067eaea9a9..c6528bab0bf0939a400045558a3e0d33
  
          public static void load() {
              chunkSettings();
-@@ -798,7 +799,7 @@ public class DivineConfig {
+@@ -796,7 +797,7 @@ public class DivineConfig {
          public static int playerProfileResultCachingTimeout = 1440;
  
          // No chat reports
@@ -71,7 +71,7 @@ index 9a2df9dbc99e9c036d36a40856dda5067eaea9a9..c6528bab0bf0939a400045558a3e0d33
          public static boolean noChatReportsAddQueryData = true;
          public static boolean noChatReportsConvertToGameMessage = true;
          public static boolean noChatReportsDebugLog = false;
-@@ -809,9 +810,9 @@ public class DivineConfig {
+@@ -807,9 +808,9 @@ public class DivineConfig {
          public static boolean protocolsAppleSkinEnabled = false;
          public static int protocolsAppleSkinSyncTickInterval = 20;
          public static boolean protocolsJadeEnabled = false;

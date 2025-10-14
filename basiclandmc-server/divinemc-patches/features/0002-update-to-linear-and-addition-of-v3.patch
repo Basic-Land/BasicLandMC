@@ -29,7 +29,7 @@ index 5586e161f1a033ef918993e3f3d092918c65a17f..ce8a353008e64d82c1e17f95ae805cb7
              LOGGER.info("Shutting down mob spawn executor...");
  
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index c6528bab0bf0939a400045558a3e0d33de5b92b9..9cf4abeb79e32734a1db9ea31a2eda495157344d 100644
+index 57dc423b349233234700c19afd42fe6008f77c45..ac14f8c8f1903ebb8d86fb78f44df71a95106472 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 @@ -10,8 +10,10 @@ import org.apache.logging.log4j.Logger;
@@ -44,7 +44,7 @@ index c6528bab0bf0939a400045558a3e0d33de5b92b9..9cf4abeb79e32734a1db9ea31a2eda49
  import org.jetbrains.annotations.Nullable;
  import org.simpleyaml.configuration.comments.CommentType;
  import org.simpleyaml.configuration.file.YamlFile;
-@@ -636,9 +638,10 @@ public class DivineConfig {
+@@ -634,9 +636,10 @@ public class DivineConfig {
  
          // Region Format
          public static EnumRegionFileExtension regionFileType = EnumRegionFileExtension.MCA;
@@ -58,7 +58,7 @@ index c6528bab0bf0939a400045558a3e0d33de5b92b9..9cf4abeb79e32734a1db9ea31a2eda49
          public static boolean linearUseVirtualThreads = true;
  
          // Sentry
-@@ -708,6 +711,13 @@ public class DivineConfig {
+@@ -706,6 +709,13 @@ public class DivineConfig {
                  regionFileType = EnumRegionFileExtension.MCA;
              }
  
@@ -72,7 +72,7 @@ index c6528bab0bf0939a400045558a3e0d33de5b92b9..9cf4abeb79e32734a1db9ea31a2eda49
              linearCompressionLevel = getInt(ConfigCategory.MISC.key("region-format.compression-level"), linearCompressionLevel,
                  "The compression level to use for the linear region file format.");
              linearIoThreadCount = getInt(ConfigCategory.MISC.key("region-format.linear-io-thread-count"), linearIoThreadCount,
-@@ -718,14 +728,14 @@ public class DivineConfig {
+@@ -716,14 +726,14 @@ public class DivineConfig {
                  "Whether to use virtual threads for IO operations that was introduced in Java 21.");
  
              if (linearCompressionLevel > 22 || linearCompressionLevel < 1) {
