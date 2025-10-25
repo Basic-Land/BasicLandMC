@@ -5,7 +5,7 @@ Subject: [PATCH] optimize-defaults-for-divinemc-config
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index 4546be176c8d47ebd60d3d775b80b41e2768ad10..57dc423b349233234700c19afd42fe6008f77c45 100644
+index 4546be176c8d47ebd60d3d775b80b41e2768ad10..d5e30ee0d4121c72c4d52f88fdde4dd87a4e8880 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 @@ -188,8 +188,8 @@ public class DivineConfig {
@@ -36,6 +36,18 @@ index 4546be176c8d47ebd60d3d775b80b41e2768ad10..57dc423b349233234700c19afd42fe60
          public static int asyncPathfindingKeepalive = 60;
          public static int asyncPathfindingQueueSize = 0;
          public static PathfindTaskRejectPolicy asyncPathfindingRejectPolicy = PathfindTaskRejectPolicy.FLUSH_ALL;
+@@ -217,9 +217,9 @@ public class DivineConfig {
+         public static int asyncEntityTrackerQueueSize = 0;
+ 
+         // Async Join Thread settings
+-        public static boolean asyncJoinEnabled = false;
++        public static boolean asyncJoinEnabled = true; // BasiclandMC optimize defaults
+         public static int asyncJoinThreadCount = 1;
+-        public static boolean asyncJoinUseVirtualThreads = false;
++        public static boolean asyncJoinUseVirtualThreads = true; // BasiclandMC optimize defaults
+ 
+         // Async chunk sending settings
+         public static boolean asyncChunkSendingEnabled = true;
 @@ -401,15 +401,16 @@ public class DivineConfig {
              "goat"
          ));
