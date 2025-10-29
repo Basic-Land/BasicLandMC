@@ -5,7 +5,7 @@ Subject: [PATCH] aswm
 
 
 diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-index 8734f54497ad7c968342db332d40f4760ebd73ac..5d63c0995d2cf952d9d2cdc7aec8fce3345d8558 100644
+index 5b0823d7a92484c7442293a53061ed38c95262af..ece1ea081c7e94685bb79743c68ce2b7a5679d00 100644
 --- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 +++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 @@ -1478,6 +1478,8 @@ public final class CraftServer implements Server {

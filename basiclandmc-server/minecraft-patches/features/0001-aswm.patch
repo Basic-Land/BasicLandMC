@@ -129,7 +129,7 @@ index 1440c9e2b106616884edcb20201113320817ed9f..bde0a9e2e2448903a16ff507c5441ebe
                                    final int chunkZ, final Priority priority) {
              super(scheduler, world, chunkX, chunkZ, MoonriseRegionFileIO.RegionFileType.CHUNK_DATA, priority);
 diff --git a/net/minecraft/server/MinecraftServer.java b/net/minecraft/server/MinecraftServer.java
-index 5a9f957fa97ab40b623a47f123e42653ac61a792..76f815830852bd166835f60d0958c885a0bba333 100644
+index 460cb8a33f377ba7378ef1917e47ec37039144b1..9e4de78999acfaac9329e4ddc59b48cdbd341fa3 100644
 --- a/net/minecraft/server/MinecraftServer.java
 +++ b/net/minecraft/server/MinecraftServer.java
 @@ -516,18 +516,33 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
@@ -167,10 +167,10 @@ index 5a9f957fa97ab40b623a47f123e42653ac61a792..76f815830852bd166835f60d0958c885
              // Migration of old CB world folders...
              String worldType = (dimension == -999) ? levelStemKey.location().getNamespace() + "_" + levelStemKey.location().getPath() : org.bukkit.World.Environment.getEnvironment(dimension).toString().toLowerCase(Locale.ROOT);
 diff --git a/net/minecraft/server/level/ServerChunkCache.java b/net/minecraft/server/level/ServerChunkCache.java
-index b05fb5946564264771f998cff418513916eb6adb..65f4b8589fef64022d4a3636fc09c5b8e7beb13b 100644
+index 71b0b72c0c65fada33bdf732aa8b366a6ab8e472..fead24f7d9715548102952fcc267c3219b633915 100644
 --- a/net/minecraft/server/level/ServerChunkCache.java
 +++ b/net/minecraft/server/level/ServerChunkCache.java
-@@ -436,7 +436,13 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+@@ -230,7 +230,13 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
              LOGGER.error("Failed to create dimension data storage directory", (Throwable)var15);
          }
  
@@ -186,7 +186,7 @@ index b05fb5946564264771f998cff418513916eb6adb..65f4b8589fef64022d4a3636fc09c5b8
          this.chunkMap = new ChunkMap(
              level,
 diff --git a/net/minecraft/server/level/ServerLevel.java b/net/minecraft/server/level/ServerLevel.java
-index 6eaa65eec584d317e8636a87bbb8ccb19f93c586..2c8d280391dbddafa9955c3b087eb7d60538516c 100644
+index 2df31be0dec475137d522450ff6e3f6e665c1d53..74e8f2dc300be596bca366d40e60d912e4d7e13a 100644
 --- a/net/minecraft/server/level/ServerLevel.java
 +++ b/net/minecraft/server/level/ServerLevel.java
 @@ -576,6 +576,8 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
@@ -250,7 +250,7 @@ index 6eaa65eec584d317e8636a87bbb8ccb19f93c586..2c8d280391dbddafa9955c3b087eb7d6
          boolean flag = server.forceSynchronousWrites();
          DataFixer fixerUpper = server.getFixerUpper();
          // Paper - rewrite chunk system
-@@ -680,7 +713,13 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+@@ -697,7 +730,13 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
          );
          this.structureManager = new StructureManager(this, this.serverLevelData.worldGenOptions(), this.structureCheck); // CraftBukkit
          if (this.dimension() == Level.END && this.dimensionTypeRegistration().is(BuiltinDimensionTypes.END) || env == org.bukkit.World.Environment.THE_END) { // CraftBukkit - Allow to create EnderDragonBattle in default and custom END
@@ -265,7 +265,7 @@ index 6eaa65eec584d317e8636a87bbb8ccb19f93c586..2c8d280391dbddafa9955c3b087eb7d6
          } else {
              this.dragonFight = null;
          }
-@@ -723,6 +762,12 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+@@ -740,6 +779,12 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
          this.dragonFight = dragonFight;
      }
  
@@ -279,7 +279,7 @@ index 6eaa65eec584d317e8636a87bbb8ccb19f93c586..2c8d280391dbddafa9955c3b087eb7d6
          this.serverLevelData.setClearWeatherTime(clearTime);
          this.serverLevelData.setRainTime(weatherTime);
 diff --git a/net/minecraft/world/level/Level.java b/net/minecraft/world/level/Level.java
-index 0b7f9af0c4e43115878769043ebd06a09ccdf059..850b67929cdc8d1bf9f9de555b7ea1161e6c1f46 100644
+index f9f0649bd4afc514618cc05afdc5af9750bbddfa..ceaac16ec58d7ee3d2cff45210e2e566da1af02e 100644
 --- a/net/minecraft/world/level/Level.java
 +++ b/net/minecraft/world/level/Level.java
 @@ -880,7 +880,7 @@ public abstract class Level implements LevelAccessor, UUIDLookup<Entity>, AutoCl
