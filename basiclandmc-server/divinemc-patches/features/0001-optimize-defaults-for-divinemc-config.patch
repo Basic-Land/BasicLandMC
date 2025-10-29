@@ -38,14 +38,14 @@ index 587cdc93accf699328005864ab9af46bfa920103..d320fc555c692c3e2299a12156c9b05e
          public static PathfindTaskRejectPolicy asyncPathfindingRejectPolicy = PathfindTaskRejectPolicy.FLUSH_ALL;
 @@ -217,9 +217,9 @@ public class DivineConfig {
          public static int asyncEntityTrackerQueueSize = 0;
-
+ 
          // Async Join Thread settings
 -        public static boolean asyncJoinEnabled = false;
 +        public static boolean asyncJoinEnabled = true; // BasiclandMC optimize defaults
          public static int asyncJoinThreadCount = 1;
 -        public static boolean asyncJoinUseVirtualThreads = false;
 +        public static boolean asyncJoinUseVirtualThreads = true; // BasiclandMC optimize defaults
-
+ 
          // Async chunk sending settings
          public static boolean asyncChunkSendingEnabled = true;
 @@ -404,15 +404,16 @@ public class DivineConfig {
