@@ -5,7 +5,7 @@ Subject: [PATCH] Rebrand
 
 
 diff --git a/src/main/java/com/destroystokyo/paper/console/PaperConsole.java b/src/main/java/com/destroystokyo/paper/console/PaperConsole.java
-index 6567ff18cb1c21230565c2d92caf3a7f7f915c17..c8ffa712b09ee534cb35851a7fff43c355ff7551 100644
+index f5bc0eff886e9e3386467f40d4f329455d0b76e6..463c08978ad0ef92bb99bd9077dfcf92aa5b34bd 100644
 --- a/src/main/java/com/destroystokyo/paper/console/PaperConsole.java
 +++ b/src/main/java/com/destroystokyo/paper/console/PaperConsole.java
 @@ -20,7 +20,7 @@ public final class PaperConsole extends SimpleTerminalConsole {
@@ -14,11 +14,11 @@ index 6567ff18cb1c21230565c2d92caf3a7f7f915c17..c8ffa712b09ee534cb35851a7fff43c3
          builder
 -                .appName("DivineMC") // DivineMC - Rebrand
 +                .appName("BasiclandMC") // BasicLandMC - Rebrand
-                 .variable(LineReader.HISTORY_FILE, java.nio.file.Paths.get(".console_history"))
+                 .variable(LineReader.HISTORY_FILE, ((java.io.File) server.options.valueOf("console-history")).toPath()) // DivineMC - make configurable location of files
                  .completer(new ConsoleCommandCompleter(this.server))
                  .option(LineReader.Option.COMPLETE_IN_WORD, true);
 diff --git a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
-index 4d3518795a238d87ca4f3df0bee074ab5bcc2734..e8f0ef936ca658e6e2a76d52fb9f81efcd488544 100644
+index b0b05383838f2ebb42791a1fca8d3ce0d361e477..1e089ba1a08f17533cdd677b5223ad2996fc35af 100644
 --- a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
 +++ b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
 @@ -35,6 +35,7 @@ public record ServerBuildInfoImpl(

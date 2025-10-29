@@ -5,7 +5,7 @@ Subject: [PATCH] optimize-defaults-for-divinemc-config
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index 2de78df409b2bcfc7750d3e3e9a740f4d97b0047..fd9397ace0a0f4e1717f507829e7d783e0586ed4 100644
+index 587cdc93accf699328005864ab9af46bfa920103..d320fc555c692c3e2299a12156c9b05efcdb1286 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 @@ -188,8 +188,8 @@ public class DivineConfig {
@@ -36,7 +36,19 @@ index 2de78df409b2bcfc7750d3e3e9a740f4d97b0047..fd9397ace0a0f4e1717f507829e7d783
          public static int asyncPathfindingKeepalive = 60;
          public static int asyncPathfindingQueueSize = 0;
          public static PathfindTaskRejectPolicy asyncPathfindingRejectPolicy = PathfindTaskRejectPolicy.FLUSH_ALL;
-@@ -401,15 +401,16 @@ public class DivineConfig {
+@@ -217,9 +217,9 @@ public class DivineConfig {
+         public static int asyncEntityTrackerQueueSize = 0;
+ 
+         // Async Join Thread settings
+-        public static boolean asyncJoinEnabled = false;
++        public static boolean asyncJoinEnabled = true; // BasiclandMC optimize defaults
+         public static int asyncJoinThreadCount = 1;
+-        public static boolean asyncJoinUseVirtualThreads = false;
++        public static boolean asyncJoinUseVirtualThreads = true; // BasiclandMC optimize defaults
+ 
+         // Async chunk sending settings
+         public static boolean asyncChunkSendingEnabled = true;
+@@ -404,15 +404,16 @@ public class DivineConfig {
              "goat"
          ));
  
@@ -62,7 +74,7 @@ index 2de78df409b2bcfc7750d3e3e9a740f4d97b0047..fd9397ace0a0f4e1717f507829e7d783
  
          public static void load() {
              chunkSettings();
-@@ -792,7 +793,7 @@ public class DivineConfig {
+@@ -799,7 +800,7 @@ public class DivineConfig {
          public static int playerProfileResultCachingTimeout = 1440;
  
          // No chat reports
@@ -71,7 +83,7 @@ index 2de78df409b2bcfc7750d3e3e9a740f4d97b0047..fd9397ace0a0f4e1717f507829e7d783
          public static boolean noChatReportsAddQueryData = true;
          public static boolean noChatReportsConvertToGameMessage = true;
          public static boolean noChatReportsDebugLog = false;
-@@ -803,9 +804,9 @@ public class DivineConfig {
+@@ -810,9 +811,9 @@ public class DivineConfig {
          public static boolean protocolsAppleSkinEnabled = false;
          public static int protocolsAppleSkinSyncTickInterval = 20;
          public static boolean protocolsJadeEnabled = false;
