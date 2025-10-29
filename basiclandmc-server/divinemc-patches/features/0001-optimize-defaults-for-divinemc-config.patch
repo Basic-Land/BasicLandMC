@@ -5,7 +5,7 @@ Subject: [PATCH] optimize-defaults-for-divinemc-config
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index 4546be176c8d47ebd60d3d775b80b41e2768ad10..d5e30ee0d4121c72c4d52f88fdde4dd87a4e8880 100644
+index 587cdc93accf699328005864ab9af46bfa920103..d320fc555c692c3e2299a12156c9b05efcdb1286 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 @@ -188,8 +188,8 @@ public class DivineConfig {
@@ -48,7 +48,7 @@ index 4546be176c8d47ebd60d3d775b80b41e2768ad10..d5e30ee0d4121c72c4d52f88fdde4dd8
  
          // Async chunk sending settings
          public static boolean asyncChunkSendingEnabled = true;
-@@ -401,15 +401,16 @@ public class DivineConfig {
+@@ -404,15 +404,16 @@ public class DivineConfig {
              "goat"
          ));
  
@@ -74,7 +74,7 @@ index 4546be176c8d47ebd60d3d775b80b41e2768ad10..d5e30ee0d4121c72c4d52f88fdde4dd8
  
          public static void load() {
              chunkSettings();
-@@ -796,7 +797,7 @@ public class DivineConfig {
+@@ -799,7 +800,7 @@ public class DivineConfig {
          public static int playerProfileResultCachingTimeout = 1440;
  
          // No chat reports
@@ -83,7 +83,7 @@ index 4546be176c8d47ebd60d3d775b80b41e2768ad10..d5e30ee0d4121c72c4d52f88fdde4dd8
          public static boolean noChatReportsAddQueryData = true;
          public static boolean noChatReportsConvertToGameMessage = true;
          public static boolean noChatReportsDebugLog = false;
-@@ -807,9 +808,9 @@ public class DivineConfig {
+@@ -810,9 +811,9 @@ public class DivineConfig {
          public static boolean protocolsAppleSkinEnabled = false;
          public static int protocolsAppleSkinSyncTickInterval = 20;
          public static boolean protocolsJadeEnabled = false;
