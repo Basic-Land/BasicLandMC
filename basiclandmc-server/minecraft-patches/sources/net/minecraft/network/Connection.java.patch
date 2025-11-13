@@ -1,11 +1,12 @@
 --- a/net/minecraft/network/Connection.java
 +++ b/net/minecraft/network/Connection.java
-@@ -199,7 +_,7 @@
+@@ -199,7 +_,8 @@
              if (this.channel.isOpen()) {
                  net.minecraft.server.level.ServerPlayer player = this.getPlayer(); // Paper - Add API for quit reason
                  if (exception instanceof TimeoutException) {
 -                    LOGGER.debug("Timeout", exception);
 +                    LOGGER.error("Timeout", exception);
++                    java.util.Arrays.stream(Thread.currentThread().getStackTrace()).map(StackTraceElement::toString).forEach(LOGGER::error);
                      if (player != null) player.quitReason = org.bukkit.event.player.PlayerQuitEvent.QuitReason.TIMED_OUT; // Paper - Add API for quit reason
                      this.disconnect(Component.translatable("disconnect.timeout"));
                  } else {
