@@ -1,27 +1,27 @@
 --- a/divinemc-api/build.gradle.kts
 +++ b/divinemc-api/build.gradle.kts
-@@ -107,20 +_,24 @@
+@@ -106,20 +_,24 @@
              srcDir(generatedDir)
              srcDir(file("../paper-api/src/main/java"))
              srcDir(file("../purpur-api/src/main/java")) // DivineMC - Rebrand
-+            srcDir(file("../divinemc-api/src/main/java"))
++            srcDir(file("../divinemc-api/src/main/java")) // BasiclandMC - Rebrand
          }
          resources {
              srcDir(file("../paper-api/src/main/resources"))
              srcDir(file("../purpur-api/src/main/resources")) // DivineMC - Rebrand
-+            srcDir(file("../divinemc-api/src/main/resources"))
++            srcDir(file("../divinemc-api/src/main/resources")) // BasiclandMC - Rebrand
          }
      }
      test {
          java {
              srcDir(file("../paper-api/src/test/java"))
              srcDir(file("../purpur-api/src/test/java")) // DivineMC - Rebrand
-+            srcDir(file("../divinemc-api/src/test/java"))
++            srcDir(file("../divinemc-api/src/test/java")) // BasiclandMC - Rebrand
          }
          resources {
              srcDir(file("../paper-api/src/test/resources"))
              srcDir(file("../purpur-api/src/test/resources")) // DivineMC - Rebrand
-+            srcDir(file("../divinemc-api/src/test/resources"))
++            srcDir(file("../divinemc-api/src/test/resources")) // BasiclandMC - Rebrand
          }
      }
  }

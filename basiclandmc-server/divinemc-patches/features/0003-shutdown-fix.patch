@@ -1,11 +1,11 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: dan28000 <84990628+dan28000@users.noreply.github.com>
-Date: Tue, 11 Nov 2025 18:20:07 +0100
+Date: Thu, 13 Nov 2025 17:18:24 +0100
 Subject: [PATCH] shutdown-fix
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/async/ExecutorShutdown.java b/src/main/java/org/bxteam/divinemc/async/ExecutorShutdown.java
-index ce8a353008e64d82c1e17f95ae805cb772d1ebd5..207891345bb6a29d842e0fb2d12b12725ea316f0 100644
+index 9ff985f543e173b7b182590086e39c63a77ca1f6..ad8d9e21e646497432de5cc8f737f0bf01511817 100644
 --- a/src/main/java/org/bxteam/divinemc/async/ExecutorShutdown.java
 +++ b/src/main/java/org/bxteam/divinemc/async/ExecutorShutdown.java
 @@ -38,7 +38,7 @@ public class ExecutorShutdown {
@@ -34,13 +34,4 @@ index ce8a353008e64d82c1e17f95ae805cb772d1ebd5..207891345bb6a29d842e0fb2d12b1272
 +        if (DivineConfig.AsyncCategory.asyncPathfinding && AsyncPathProcessor.PATH_PROCESSING_EXECUTOR != null) {
              LOGGER.info("Shutting down mob pathfinding processing executor...");
              AsyncPathProcessor.PATH_PROCESSING_EXECUTOR.shutdown();
- 
-@@ -65,7 +65,7 @@ public class ExecutorShutdown {
-             } catch (InterruptedException ignored) { }
-         }
- 
--        if (AsyncJoinHandler.JOIN_EXECUTOR != null) {
-+        if (DivineConfig.AsyncCategory.asyncJoinEnabled && AsyncJoinHandler.JOIN_EXECUTOR != null) {
-             LOGGER.info("Shutting down async join executor...");
-             AsyncJoinHandler.JOIN_EXECUTOR.shutdown();
  

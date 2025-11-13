@@ -1,11 +1,11 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: dan28000 <84990628+dan28000@users.noreply.github.com>
-Date: Sun, 27 Jul 2025 19:06:43 +0200
+Date: Thu, 13 Nov 2025 17:12:34 +0100
 Subject: [PATCH] update-to-linear-and-addition-of-v3
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/async/ExecutorShutdown.java b/src/main/java/org/bxteam/divinemc/async/ExecutorShutdown.java
-index 5586e161f1a033ef918993e3f3d092918c65a17f..ce8a353008e64d82c1e17f95ae805cb772d1ebd5 100644
+index ef386086faff5cc1b7912fe590adc29a87f22e6d..9ff985f543e173b7b182590086e39c63a77ca1f6 100644
 --- a/src/main/java/org/bxteam/divinemc/async/ExecutorShutdown.java
 +++ b/src/main/java/org/bxteam/divinemc/async/ExecutorShutdown.java
 @@ -7,6 +7,7 @@ import org.bxteam.divinemc.async.pathfinding.AsyncPathProcessor;
@@ -29,22 +29,20 @@ index 5586e161f1a033ef918993e3f3d092918c65a17f..ce8a353008e64d82c1e17f95ae805cb7
              LOGGER.info("Shutting down mob spawn executor...");
  
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index d320fc555c692c3e2299a12156c9b05efcdb1286..7458803cbde776fac0a340b6f96aeb10be65c47e 100644
+index 144ef92f25ddda16584bf7e12a308383065bd6b6..d984ac6b4deeaae8756728549af99bd84eea638b 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-@@ -10,8 +10,10 @@ import org.apache.logging.log4j.Logger;
+@@ -11,7 +11,8 @@ import org.bxteam.divinemc.chunk.ChunkSystemAlgorithm;
  import org.bxteam.divinemc.config.annotations.Experimental;
  import org.bxteam.divinemc.async.pathfinding.PathfindTaskRejectPolicy;
  import org.bxteam.divinemc.region.EnumRegionFileExtension;
 -import org.bxteam.divinemc.region.type.LinearRegionFile;
 +import org.bxteam.divinemc.region.linear.LinearImplementation;
- import org.bxteam.divinemc.async.AsyncJoinHandler;
-+import org.bxteam.divinemc.region.linear.LinearRegionFile;
 +import org.bxteam.divinemc.region.linear.LinearRegionFileFlusher;
  import org.jetbrains.annotations.Nullable;
  import org.simpleyaml.configuration.comments.CommentType;
  import org.simpleyaml.configuration.file.YamlFile;
-@@ -637,9 +639,10 @@ public class DivineConfig {
+@@ -621,9 +622,10 @@ public class DivineConfig {
  
          // Region Format
          public static EnumRegionFileExtension regionFileType = EnumRegionFileExtension.MCA;
@@ -58,7 +56,7 @@ index d320fc555c692c3e2299a12156c9b05efcdb1286..7458803cbde776fac0a340b6f96aeb10
          public static boolean linearUseVirtualThreads = true;
  
          // Sentry
-@@ -709,6 +712,13 @@ public class DivineConfig {
+@@ -693,6 +695,13 @@ public class DivineConfig {
                  regionFileType = EnumRegionFileExtension.MCA;
              }
  
@@ -72,7 +70,7 @@ index d320fc555c692c3e2299a12156c9b05efcdb1286..7458803cbde776fac0a340b6f96aeb10
              linearCompressionLevel = getInt(ConfigCategory.MISC.key("region-format.compression-level"), linearCompressionLevel,
                  "The compression level to use for the linear region file format.");
              linearIoThreadCount = getInt(ConfigCategory.MISC.key("region-format.linear-io-thread-count"), linearIoThreadCount,
-@@ -719,14 +729,14 @@ public class DivineConfig {
+@@ -703,14 +712,14 @@ public class DivineConfig {
                  "Whether to use virtual threads for IO operations that was introduced in Java 21.");
  
              if (linearCompressionLevel > 22 || linearCompressionLevel < 1) {
@@ -93,15 +91,16 @@ index d320fc555c692c3e2299a12156c9b05efcdb1286..7458803cbde776fac0a340b6f96aeb10
          }
  
 diff --git a/src/main/java/org/bxteam/divinemc/region/EnumRegionFileExtension.java b/src/main/java/org/bxteam/divinemc/region/EnumRegionFileExtension.java
-index 17eef9a64e2e2bb7e2310e5f01e2e9d62e01a88b..7481831dcd6f362dce6ed3b28b61f218416fcd51 100644
+index 17eef9a64e2e2bb7e2310e5f01e2e9d62e01a88b..5e1b076b292dd594b1c66c5eb4b414fe48d12916 100644
 --- a/src/main/java/org/bxteam/divinemc/region/EnumRegionFileExtension.java
 +++ b/src/main/java/org/bxteam/divinemc/region/EnumRegionFileExtension.java
-@@ -3,12 +3,12 @@ package org.bxteam.divinemc.region;
+@@ -2,13 +2,13 @@ package org.bxteam.divinemc.region;
+ 
  import net.minecraft.world.level.chunk.storage.RegionFile;
  import org.bxteam.divinemc.config.DivineConfig;
++import org.bxteam.divinemc.region.linear.LinearRegionFile;
  import org.bxteam.divinemc.region.type.BufferedRegionFile;
 -import org.bxteam.divinemc.region.type.LinearRegionFile;
-+import org.bxteam.divinemc.region.linear.LinearRegionFile;
  import org.jetbrains.annotations.Nullable;
  
  public enum EnumRegionFileExtension {
@@ -522,14 +521,13 @@ index 0000000000000000000000000000000000000000..208b97b23af4c4c2ed7ff66966f59998
 +}
 diff --git a/src/main/java/org/bxteam/divinemc/region/linear/LinearRegionFileFlusher.java b/src/main/java/org/bxteam/divinemc/region/linear/LinearRegionFileFlusher.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..668adf8e8875a535c50c36a2a4a94c4d34268fc7
+index 0000000000000000000000000000000000000000..6faa713f32c6a928591b8262fa7977edbe21bef5
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/region/linear/LinearRegionFileFlusher.java
-@@ -0,0 +1,69 @@
+@@ -0,0 +1,68 @@
 +package org.bxteam.divinemc.region.linear;
 +
 +import com.google.common.util.concurrent.ThreadFactoryBuilder;
-+import org.bxteam.divinemc.config.DivineConfig;
 +
 +import java.util.Queue;
 +import java.util.concurrent.*;

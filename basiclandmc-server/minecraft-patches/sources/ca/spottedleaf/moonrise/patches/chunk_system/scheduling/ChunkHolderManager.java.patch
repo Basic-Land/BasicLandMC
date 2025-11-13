@@ -1,6 +1,6 @@
 --- a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
 +++ b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
-@@ -339,7 +_,7 @@
+@@ -345,7 +_,7 @@
              }
              if (logProgress) {
                  final long currTime = System.nanoTime();

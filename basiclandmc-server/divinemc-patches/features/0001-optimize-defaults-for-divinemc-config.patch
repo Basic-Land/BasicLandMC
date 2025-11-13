@@ -1,11 +1,11 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: dan28000 <84990628+dan28000@users.noreply.github.com>
-Date: Tue, 29 Jul 2025 10:36:20 +0200
+Date: Thu, 13 Nov 2025 16:56:57 +0100
 Subject: [PATCH] optimize-defaults-for-divinemc-config
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index 587cdc93accf699328005864ab9af46bfa920103..d320fc555c692c3e2299a12156c9b05efcdb1286 100644
+index d93a2efec8807810d855b634cec392d011ae5d05..144ef92f25ddda16584bf7e12a308383065bd6b6 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 @@ -188,8 +188,8 @@ public class DivineConfig {
@@ -18,8 +18,8 @@ index 587cdc93accf699328005864ab9af46bfa920103..d320fc555c692c3e2299a12156c9b05e
 +        public static int parallelThreadCount = 6; // BasiclandMC optimize defaults
          public static boolean logContainerCreationStacktraces = false;
          public static boolean disableHardThrow = false;
-         public static boolean pwtCompatabilityMode = false;
-@@ -198,13 +198,13 @@ public class DivineConfig {
+         public static boolean usePerWorldTpsBar = true;
+@@ -197,8 +197,8 @@ public class DivineConfig {
  
          // Regionized chunk ticking
          @Experimental("Regionized Chunk Ticking")
@@ -30,25 +30,7 @@ index 587cdc93accf699328005864ab9af46bfa920103..d320fc555c692c3e2299a12156c9b05e
          public static int regionizedChunkTickingExecutorThreadPriority = Thread.NORM_PRIORITY + 2;
  
          // Async pathfinding settings
-         public static boolean asyncPathfinding = true;
--        public static int asyncPathfindingMaxThreads = 1;
-+        public static int asyncPathfindingMaxThreads = 1; // BasiclandMC optimize defaults
-         public static int asyncPathfindingKeepalive = 60;
-         public static int asyncPathfindingQueueSize = 0;
-         public static PathfindTaskRejectPolicy asyncPathfindingRejectPolicy = PathfindTaskRejectPolicy.FLUSH_ALL;
-@@ -217,9 +217,9 @@ public class DivineConfig {
-         public static int asyncEntityTrackerQueueSize = 0;
- 
-         // Async Join Thread settings
--        public static boolean asyncJoinEnabled = false;
-+        public static boolean asyncJoinEnabled = true; // BasiclandMC optimize defaults
-         public static int asyncJoinThreadCount = 1;
--        public static boolean asyncJoinUseVirtualThreads = false;
-+        public static boolean asyncJoinUseVirtualThreads = true; // BasiclandMC optimize defaults
- 
-         // Async chunk sending settings
-         public static boolean asyncChunkSendingEnabled = true;
-@@ -404,15 +404,16 @@ public class DivineConfig {
+@@ -384,14 +384,15 @@ public class DivineConfig {
              "goat"
          ));
  
@@ -59,7 +41,6 @@ index 587cdc93accf699328005864ab9af46bfa920103..d320fc555c692c3e2299a12156c9b05e
 -        public static boolean virtualTabCompleteScheduler = false;
 -        public static boolean virtualAsyncExecutor = false;
 -        public static boolean virtualCommandBuilderScheduler = false;
--        public static boolean virtualProfileLookupPool = false;
 -        public static boolean virtualServerTextFilterPool = false;
 +        // Virtual threads // BasiclandMC optimize defaults start
 +        public static boolean virtualThreadsEnabled = true;
@@ -68,13 +49,12 @@ index 587cdc93accf699328005864ab9af46bfa920103..d320fc555c692c3e2299a12156c9b05e
 +        public static boolean virtualTabCompleteScheduler = true;
 +        public static boolean virtualAsyncExecutor = true;
 +        public static boolean virtualCommandBuilderScheduler = true;
-+        public static boolean virtualProfileLookupPool = true;
 +        public static boolean virtualServerTextFilterPool = true;
 +        // BasiclandMC optimize defaults end
  
          public static void load() {
              chunkSettings();
-@@ -799,7 +800,7 @@ public class DivineConfig {
+@@ -783,7 +784,7 @@ public class DivineConfig {
          public static int playerProfileResultCachingTimeout = 1440;
  
          // No chat reports
@@ -83,7 +63,7 @@ index 587cdc93accf699328005864ab9af46bfa920103..d320fc555c692c3e2299a12156c9b05e
          public static boolean noChatReportsAddQueryData = true;
          public static boolean noChatReportsConvertToGameMessage = true;
          public static boolean noChatReportsDebugLog = false;
-@@ -810,9 +811,9 @@ public class DivineConfig {
+@@ -794,9 +795,9 @@ public class DivineConfig {
          public static boolean protocolsAppleSkinEnabled = false;
          public static int protocolsAppleSkinSyncTickInterval = 20;
          public static boolean protocolsJadeEnabled = false;
