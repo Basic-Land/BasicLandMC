@@ -110,12 +110,45 @@ index 17eef9a64e2e2bb7e2310e5f01e2e9d62e01a88b..5e1b076b292dd594b1c66c5eb4b414fe
      B_LINEAR("b_linear", "b_linear", (info) -> new BufferedRegionFile(info.filePath(), DivineConfig.MiscCategory.linearCompressionLevel));
  
      private final String name;
+diff --git a/src/main/java/org/bxteam/divinemc/region/IRegionFile.java b/src/main/java/org/bxteam/divinemc/region/IRegionFile.java
+index 18708b541e1d473564f9a269651a6ad3991b7249..03186d4fb4139430c7f5f99c97c8e60a5fe136e2 100644
+--- a/src/main/java/org/bxteam/divinemc/region/IRegionFile.java
++++ b/src/main/java/org/bxteam/divinemc/region/IRegionFile.java
+@@ -29,13 +29,23 @@ public interface IRegionFile extends ChunkSystemRegionFile, AutoCloseable {
+ 
+     void write(ChunkPos pos, ByteBuffer buf) throws IOException;
+ 
+-    CompoundTag getOversizedData(int x, int z) throws IOException;
++    default CompoundTag getOversizedData(int x, int z) throws IOException {
++        return null;
++    }
+ 
+-    boolean isOversized(int x, int z);
++    default boolean isOversized(int x, int z) {
++        return false;
++    }
+ 
+-    boolean recalculateHeader() throws IOException;
++    default boolean recalculateHeader() throws IOException {
++        return false;
++    }
+ 
+-    void setOversized(int x, int z, boolean oversized) throws IOException;
++    default void setOversized(int x, int z, boolean oversized) throws IOException {
+ 
+-    int getRecalculateCount();
++    }
++
++    default int getRecalculateCount() {
++        return 0;
++    }
+ }
 diff --git a/src/main/java/org/bxteam/divinemc/region/linear/LinearBase.java b/src/main/java/org/bxteam/divinemc/region/linear/LinearBase.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..17fef8da3a4a707bcab03e4d02da8f7ced15f99f
+index 0000000000000000000000000000000000000000..ee26d582b286d09f0de071f0bdfe22740e3c63cb
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/region/linear/LinearBase.java
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,54 @@
 +package org.bxteam.divinemc.region.linear;
 +
 +import net.jpountz.lz4.LZ4Compressor;
@@ -124,12 +157,13 @@ index 0000000000000000000000000000000000000000..17fef8da3a4a707bcab03e4d02da8f7c
 +import org.bxteam.divinemc.region.linear.versions.V1Linear;
 +import org.bxteam.divinemc.region.linear.versions.V2Linear;
 +import org.bxteam.divinemc.region.linear.versions.V3Linear;
-+import org.bxteam.divinemc.region.linear.versions.Version;
 +import org.slf4j.Logger;
 +
++import java.io.IOException;
++import java.nio.ByteBuffer;
 +import java.nio.file.Path;
 +
-+public abstract class LinearBase implements Version {
++public abstract class LinearBase {
 +
 +    protected static final Logger LOGGER = LinearRegionFile.LOGGER;
 +    protected static final long SUPERBLOCK = LinearRegionFile.SUPERBLOCK;
@@ -140,11 +174,21 @@ index 0000000000000000000000000000000000000000..17fef8da3a4a707bcab03e4d02da8f7c
 +    protected final LZ4Compressor compressor = LZ4Factory.fastestInstance().fastCompressor();
 +    protected final LZ4FastDecompressor decompressor = LZ4Factory.fastestInstance().fastDecompressor();
 +    protected final int compressionLevel;
++    private final LinearImplementation impl;
 +
-+    public LinearBase(Path regionFilePath, int compressionLevel) {
++    public LinearBase(Path regionFilePath, int compressionLevel, LinearImplementation impl) {
 +        this.regionFilePath = regionFilePath;
 +        this.compressionLevel = compressionLevel;
++        this.impl = impl;
 +    }
++
++    public final byte version() {
++        return impl.version();
++    }
++
++    public abstract void parse(ByteBuffer byteBuffer) throws IOException;
++
++    public abstract void flush() throws IOException;
 +
 +    protected static int currentTimestamp() {
 +        return (int) (System.currentTimeMillis() / 1000L);
@@ -185,10 +229,10 @@ index 0000000000000000000000000000000000000000..aa3e4f0503f1f1c0d98d1fd2815b0690
 +}
 diff --git a/src/main/java/org/bxteam/divinemc/region/linear/LinearRegionFile.java b/src/main/java/org/bxteam/divinemc/region/linear/LinearRegionFile.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..208b97b23af4c4c2ed7ff66966f59998d781cbe5
+index 0000000000000000000000000000000000000000..a1c1b8c1f3fb8c9fdbe28a13370697c38feee769
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/region/linear/LinearRegionFile.java
-@@ -0,0 +1,330 @@
+@@ -0,0 +1,305 @@
 +package org.bxteam.divinemc.region.linear;
 +
 +import ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO;
@@ -479,31 +523,6 @@ index 0000000000000000000000000000000000000000..208b97b23af4c4c2ed7ff66966f59998
 +        );
 +    }
 +
-+    @Override
-+    public boolean recalculateHeader() {
-+        return false;
-+    }
-+
-+    @Override
-+    public int getRecalculateCount() {
-+        return 0;
-+    }
-+
-+    @Override
-+    public void setOversized(int x, int z, boolean something) {
-+        // stub
-+    }
-+
-+    @Override
-+    public CompoundTag getOversizedData(int x, int z) throws IOException {
-+        throw new IOException("getOversizedData is a stub " + regionFilePath);
-+    }
-+
-+    @Override
-+    public boolean isOversized(int x, int z) {
-+        return false;
-+    }
-+
 +    private class ChunkBuffer extends ByteArrayOutputStream {
 +        private final ChunkPos pos;
 +
@@ -595,7 +614,7 @@ index 0000000000000000000000000000000000000000..6faa713f32c6a928591b8262fa7977ed
 +}
 diff --git a/src/main/java/org/bxteam/divinemc/region/linear/V2LinearBase.java b/src/main/java/org/bxteam/divinemc/region/linear/V2LinearBase.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..634452d469feeb20a3d6395e3b8f104554a47c1b
+index 0000000000000000000000000000000000000000..65eb043e52856826e883eb13580bfea187c2cff2
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/region/linear/V2LinearBase.java
 @@ -0,0 +1,129 @@
@@ -613,8 +632,8 @@ index 0000000000000000000000000000000000000000..634452d469feeb20a3d6395e3b8f1045
 +    protected int bucketSize = 4;
 +    protected byte[][] bucketBuffers;
 +
-+    public V2LinearBase(Path regionFilePath, int compressionLevel) {
-+        super(regionFilePath, compressionLevel);
++    public V2LinearBase(Path regionFilePath, int compressionLevel, LinearImplementation impl) {
++        super(regionFilePath, compressionLevel, impl);
 +    }
 +
 +    protected byte[][] buildBuckets() throws IOException {
@@ -730,10 +749,10 @@ index 0000000000000000000000000000000000000000..634452d469feeb20a3d6395e3b8f1045
 +}
 diff --git a/src/main/java/org/bxteam/divinemc/region/linear/versions/V1Linear.java b/src/main/java/org/bxteam/divinemc/region/linear/versions/V1Linear.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..71e96d2f463579eea6d3c0f168572196bc31eb5a
+index 0000000000000000000000000000000000000000..0108eb80bbb025d56783ce6e709a80cac9df236a
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/region/linear/versions/V1Linear.java
-@@ -0,0 +1,125 @@
+@@ -0,0 +1,120 @@
 +package org.bxteam.divinemc.region.linear.versions;
 +
 +import com.github.luben.zstd.ZstdInputStream;
@@ -750,12 +769,7 @@ index 0000000000000000000000000000000000000000..71e96d2f463579eea6d3c0f168572196
 +
 +public class V1Linear extends LinearBase {
 +    public V1Linear(Path regionFilePath, int compressionLevel) {
-+        super(regionFilePath, compressionLevel);
-+    }
-+
-+    @Override
-+    public LinearImplementation implementation() {
-+        return LinearImplementation.V1;
++        super(regionFilePath, compressionLevel, LinearImplementation.V1);
 +    }
 +
 +    @Override
@@ -861,10 +875,10 @@ index 0000000000000000000000000000000000000000..71e96d2f463579eea6d3c0f168572196
 +}
 diff --git a/src/main/java/org/bxteam/divinemc/region/linear/versions/V2Linear.java b/src/main/java/org/bxteam/divinemc/region/linear/versions/V2Linear.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..8c381fff302ba63388550551f992659fcca50bc4
+index 0000000000000000000000000000000000000000..0e2047813c745a1f36d3aa55c177b04665a9f4b0
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/region/linear/versions/V2Linear.java
-@@ -0,0 +1,169 @@
+@@ -0,0 +1,164 @@
 +package org.bxteam.divinemc.region.linear.versions;
 +
 +import net.openhft.hashing.LongHashFunction;
@@ -882,12 +896,7 @@ index 0000000000000000000000000000000000000000..8c381fff302ba63388550551f992659f
 +
 +public class V2Linear extends V2LinearBase {
 +    public V2Linear(Path regionFilePath, int compressionLevel) {
-+        super(regionFilePath, compressionLevel);
-+    }
-+
-+    @Override
-+    public LinearImplementation implementation() {
-+        return LinearImplementation.V2;
++        super(regionFilePath, compressionLevel, LinearImplementation.V2);
 +    }
 +
 +    @Override
@@ -1036,10 +1045,10 @@ index 0000000000000000000000000000000000000000..8c381fff302ba63388550551f992659f
 +}
 diff --git a/src/main/java/org/bxteam/divinemc/region/linear/versions/V3Linear.java b/src/main/java/org/bxteam/divinemc/region/linear/versions/V3Linear.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..2ba4543b056ea86132d0804325cc79d8b74eb022
+index 0000000000000000000000000000000000000000..31c7f54a15d8fdfe0af30b42a80f0880af367b01
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/region/linear/versions/V3Linear.java
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,88 @@
 +package org.bxteam.divinemc.region.linear.versions;
 +
 +import net.openhft.hashing.LongHashFunction;
@@ -1057,17 +1066,7 @@ index 0000000000000000000000000000000000000000..2ba4543b056ea86132d0804325cc79d8
 +
 +public class V3Linear extends V2LinearBase {
 +    public V3Linear(Path regionFilePath, int compressionLevel) {
-+        super(regionFilePath, compressionLevel);
-+    }
-+
-+    @Override
-+    public LinearImplementation implementation() {
-+        return LinearImplementation.V3;
-+    }
-+
-+    @Override
-+    public byte version() {
-+        return implementation().version();
++        super(regionFilePath, compressionLevel, LinearImplementation.V3);
 +    }
 +
 +    @Override
@@ -1138,31 +1137,97 @@ index 0000000000000000000000000000000000000000..2ba4543b056ea86132d0804325cc79d8
 +        Files.move(tempFile.toPath(), regionFilePath, StandardCopyOption.REPLACE_EXISTING);
 +    }
 +}
-diff --git a/src/main/java/org/bxteam/divinemc/region/linear/versions/Version.java b/src/main/java/org/bxteam/divinemc/region/linear/versions/Version.java
-new file mode 100644
-index 0000000000000000000000000000000000000000..0698a826649445133c83314d077b69110081aa98
---- /dev/null
-+++ b/src/main/java/org/bxteam/divinemc/region/linear/versions/Version.java
-@@ -0,0 +1,19 @@
-+package org.bxteam.divinemc.region.linear.versions;
-+
-+import org.bxteam.divinemc.region.linear.LinearImplementation;
-+
-+import java.io.IOException;
-+import java.nio.ByteBuffer;
-+
-+public interface Version {
-+    LinearImplementation implementation();
-+
-+    default byte version() {
-+        return implementation().version();
-+    }
-+
-+    void parse(ByteBuffer byteBuffer) throws IOException;
-+
-+    void flush() throws IOException;
-+
-+}
+diff --git a/src/main/java/org/bxteam/divinemc/region/type/BufferedRegionFile.java b/src/main/java/org/bxteam/divinemc/region/type/BufferedRegionFile.java
+index 0e1cb86b697111c8df43dce8a7cfdfc7b1ff2345..e9f1fdabf60fa9184942270782e149065094be4e 100644
+--- a/src/main/java/org/bxteam/divinemc/region/type/BufferedRegionFile.java
++++ b/src/main/java/org/bxteam/divinemc/region/type/BufferedRegionFile.java
+@@ -49,7 +49,6 @@ public class BufferedRegionFile implements IRegionFile {
+     private final ReadWriteLock fileAccessLock = new ReentrantReadWriteLock();
+     private final XXHash32 xxHash32 = XXHashFactory.fastestInstance().hash32();
+     private final Sector[] sectors = new Sector[1024];
+-    private final AtomicInteger recalculateCount = new AtomicInteger(0);
+     private long currentAcquiredIndex = this.headerSize();
+     private byte compressionLevel = 6;
+     private int xxHash32Seed = HASH_SEED;
+@@ -146,9 +145,9 @@ public class BufferedRegionFile implements IRegionFile {
+ 
+         synchronized (MANAGED_FILES) {
+             copied = Arrays.copyOf(
+-                    MANAGED_FILES.toArray(new BufferedRegionFile[0]),
+-                    MANAGED_FILES.size(),
+-                    BufferedRegionFile[].class
++                MANAGED_FILES.toArray(new BufferedRegionFile[0]),
++                MANAGED_FILES.size(),
++                BufferedRegionFile[].class
+             );
+         }
+ 
+@@ -346,7 +345,7 @@ public class BufferedRegionFile implements IRegionFile {
+             sectorSize += sector.length;
+         }
+ 
+-        if (spareSize > AUTO_COMPACT_SIZE && (double)spareSize > ((double)sectorSize) * AUTO_COMPACT_PERCENT) {
++        if (spareSize > AUTO_COMPACT_SIZE && (double) spareSize > ((double) sectorSize) * AUTO_COMPACT_PERCENT) {
+             this.compact();
+         }
+     }
+@@ -367,7 +366,7 @@ public class BufferedRegionFile implements IRegionFile {
+             StandardOpenOption.CREATE,
+             StandardOpenOption.WRITE,
+             StandardOpenOption.READ
+-        )){
++        )) {
+             final ByteBuffer headerBuffer = ByteBuffer.allocateDirect(this.headerSize());
+             this.channel.read(headerBuffer, 0);
+             headerBuffer.flip();
+@@ -667,7 +666,7 @@ public class BufferedRegionFile implements IRegionFile {
+         this.fileAccessLock.readLock().lock();
+         try {
+             return this.hasData(getChunkIndex(pos.x, pos.z));
+-        }finally {
++        } finally {
+             this.fileAccessLock.readLock().unlock();
+         }
+     }
+@@ -677,37 +676,11 @@ public class BufferedRegionFile implements IRegionFile {
+         this.fileAccessLock.writeLock().lock();
+         try {
+             this.writeChunk(pos.x, pos.z, buf);
+-        }finally {
++        } finally {
+             this.fileAccessLock.writeLock().unlock();
+         }
+     }
+ 
+-    @Override
+-    public CompoundTag getOversizedData(int x, int z) {
+-        return null;
+-    }
+-
+-    @Override
+-    public boolean isOversized(int x, int z) {
+-        return false;
+-    }
+-
+-    @Override
+-    public boolean recalculateHeader() {
+-        this.recalculateCount.incrementAndGet();
+-        return false;
+-    }
+-
+-    @Override
+-    public void setOversized(int x, int z, boolean oversized) {
+-
+-    }
+-
+-    @Override
+-    public int getRecalculateCount() {
+-        return this.recalculateCount.get();
+-    }
+-
+     @Override
+     public MoonriseRegionFileIO.RegionDataController.WriteData moonrise$startWrite(CompoundTag data, ChunkPos pos) {
+         final DataOutputStream out = this.getChunkDataOutputStream(pos);
 diff --git a/src/main/java/org/bxteam/divinemc/region/type/LinearRegionFile.java b/src/main/java/org/bxteam/divinemc/region/type/LinearRegionFile.java
 deleted file mode 100644
 index 5b71ff5f24acd1fca7e37fede624a58c2c922652..0000000000000000000000000000000000000000
