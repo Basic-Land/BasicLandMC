@@ -1,0 +1,366 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Mon, 15 Dec 2025 20:04:17 +0100
+Subject: [PATCH] waypoint-fix-test
+
+
+diff --git a/net/minecraft/server/level/ServerPlayer.java b/net/minecraft/server/level/ServerPlayer.java
+index 963aaef7493e1e281882a9eeca72b1a08fe9cbe8..8a196683406463fc9b16e2edd76308785e2292a4 100644
+--- a/net/minecraft/server/level/ServerPlayer.java
++++ b/net/minecraft/server/level/ServerPlayer.java
+@@ -266,6 +266,7 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+     private Vec3 lastKnownClientMovement = Vec3.ZERO;
+     private Input lastClientInput = Input.EMPTY;
+     private final Set<ThrownEnderpearl> enderPearls = new HashSet<>();
++    public final it.unimi.dsi.fastutil.objects.Object2ObjectMap<net.minecraft.world.waypoints.WaypointTransmitter, net.minecraft.world.waypoints.WaypointTransmitter.Connection> canvas$activeWaypoints = new it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap<>(); // Canvas - region threading
+     public final ContainerSynchronizer containerSynchronizer = new ContainerSynchronizer() {
+         private final LoadingCache<TypedDataComponent<?>, Integer> cache = CacheBuilder.newBuilder()
+             .maximumSize(256L)
+@@ -3177,4 +3178,14 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+         this.ramBar = ramBar;
+     }
+     // Purpur end - Add rambar command
++
++    public void scheduleToOrRun(Runnable task) {
++        if (ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(this)) {
++            task.run();
++            return;
++        }
++        this.getBukkitEntity().taskScheduler.schedule(
++            (entity) -> task.run(), null, 1L
++        );
++    }
+ }
+diff --git a/net/minecraft/server/waypoints/ServerWaypointManager.java b/net/minecraft/server/waypoints/ServerWaypointManager.java
+index 839f6b7696ef85314da185bedba7cfc5870c314a..0652fbbad442bda7a71f1d1fa78e8b9e544b5862 100644
+--- a/net/minecraft/server/waypoints/ServerWaypointManager.java
++++ b/net/minecraft/server/waypoints/ServerWaypointManager.java
+@@ -1,157 +1,234 @@
+ package net.minecraft.server.waypoints;
+ 
+-import com.google.common.collect.HashBasedTable;
+-import com.google.common.collect.ImmutableSet;
+-import com.google.common.collect.Sets;
+-import com.google.common.collect.Table;
+-import com.google.common.collect.Tables;
+-import com.google.common.collect.Sets.SetView;
++import ca.spottedleaf.concurrentutil.collection.MultiThreadedQueue;
++import ca.spottedleaf.moonrise.common.util.TickThread;
++
+ import java.util.HashSet;
+ import java.util.Map;
+ import java.util.Set;
+-import java.util.Map.Entry;
++
++import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
++import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.server.level.ServerPlayer;
+ import net.minecraft.world.level.GameRules;
+ import net.minecraft.world.waypoints.WaypointManager;
+ import net.minecraft.world.waypoints.WaypointTransmitter;
++import org.jetbrains.annotations.NotNull;
++import org.jetbrains.annotations.Nullable;
+ 
+ public class ServerWaypointManager implements WaypointManager<WaypointTransmitter> {
+-    private final Set<WaypointTransmitter> waypoints = new HashSet<>();
+-    private final Set<ServerPlayer> players = new HashSet<>();
+-    private final Table<ServerPlayer, WaypointTransmitter, WaypointTransmitter.Connection> connections = HashBasedTable.create();
+-    // DivineMC start - Parallel world ticking
+-    private final net.minecraft.server.level.ServerLevel level;
++    private static final double SCALE = 4000.0D;
++
++    private final MultiThreadedQueue<WaypointTransmitter> waypoints = new MultiThreadedQueue<>();
++    private final MultiThreadedQueue<ServerPlayer> players = new MultiThreadedQueue<>();
++    private final ServerLevel world;
+ 
+-    public ServerWaypointManager(net.minecraft.server.level.ServerLevel level) {
+-        this.level = level;
++    public ServerWaypointManager(ServerLevel world) {
++        this.world = world;
++    }
++
++    public boolean isLocatorBarDisabled() {
++        return !world.getGameRules().getBoolean(GameRules.RULE_LOCATOR_BAR);
+     }
+-    // DivineMC end - Parallel world ticking
+ 
+     @Override
+     public void trackWaypoint(WaypointTransmitter waypoint) {
+-        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking) ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(this.level, "Cannot track waypoints off-main"); // DivineMC - Parallel world ticking
+-        this.waypoints.add(waypoint);
++        if (isLocatorBarDisabled()) return;
++        if (!waypoints.contains(waypoint)) waypoints.add(waypoint);
+ 
+-        for (ServerPlayer serverPlayer : this.players) {
+-            this.createConnection(serverPlayer, waypoint);
++        for (ServerPlayer player : players) {
++            player.scheduleToOrRun(() -> {
++                createConnection(player, waypoint);
++            });
+         }
+     }
+ 
++    private static boolean shouldScheduleBasedOnDistance(@NotNull ServerPlayer origin, ServerPlayer target) {
++        final double scaled = origin.distanceTo(target) / SCALE;
++        return origin.random.nextDouble() < (1.0 / (1.0 + (scaled * scaled)));
++    }
++
+     @Override
+     public void updateWaypoint(WaypointTransmitter waypoint) {
+-        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking) ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(this.level, "Cannot update waypoints off-main"); // DivineMC - Parallel world ticking
+-        if (this.waypoints.contains(waypoint)) {
+-            Map<ServerPlayer, WaypointTransmitter.Connection> map = Tables.transpose(this.connections).row(waypoint);
+-            SetView<ServerPlayer> set = Sets.difference(this.players, map.keySet());
++        if (isLocatorBarDisabled()) return;
++        if (!waypoints.contains(waypoint)) return;
+ 
+-            for (Entry<ServerPlayer, WaypointTransmitter.Connection> entry : ImmutableSet.copyOf(map.entrySet())) {
+-                this.updateConnection(entry.getKey(), waypoint, entry.getValue());
+-            }
++        final ServerPlayer updating = (ServerPlayer) waypoint;
++
++        for (ServerPlayer player : players) {
++            if (player == updating) continue;
+ 
+-            for (ServerPlayer serverPlayer : set) {
+-                this.createConnection(serverPlayer, waypoint);
++            if (updating.distanceTo(player) > 332.0F && !shouldScheduleBasedOnDistance(updating, player)) {
++                continue;
+             }
++
++            player.scheduleToOrRun(() -> {
++                updateWaypoint(waypoint, player);
++            });
++        }
++    }
++
++    // Note: this should be scheduled on 'player'
++    private void updateWaypoint(WaypointTransmitter waypoint, @NotNull ServerPlayer player) {
++        TickThread.ensureTickThread(player, "Cannot update waypoint off owning thread of player");
++        final Object2ObjectMap<WaypointTransmitter, WaypointTransmitter.Connection> map = player.canvas$activeWaypoints;
++        final WaypointTransmitter.Connection conn = map.get(waypoint);
++
++        if (conn != null) {
++            CallbackHolder callbackHolder = updateConnection(player, waypoint, conn);
++            if (callbackHolder != null) callbackHolder.call.run();
++        } else {
++            createConnection(player, waypoint);
+         }
+     }
+ 
+     @Override
+     public void untrackWaypoint(WaypointTransmitter waypoint) {
+-        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking) ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(this.level, "Cannot untrack waypoints off-main"); // DivineMC - Parallel world ticking
+-        this.connections.column(waypoint).forEach((serverPlayer, connection) -> connection.disconnect());
+-        Tables.transpose(this.connections).row(waypoint).clear();
+-        this.waypoints.remove(waypoint);
++        for (ServerPlayer player : players) {
++            player.scheduleToOrRun(() -> {
++                disconnectWaypoint(waypoint, player);
++            });
++        }
++
++        waypoints.remove(waypoint);
++    }
++
++    // Note: this should be scheduled on the 'player'
++    private void disconnectWaypoint(WaypointTransmitter waypoint, @NotNull ServerPlayer player) {
++        TickThread.ensureTickThread(player, "Cannot disconnect waypoint off owning thread of player");
++        final Object2ObjectMap<WaypointTransmitter, WaypointTransmitter.Connection> map = player.canvas$activeWaypoints;
++        final WaypointTransmitter.Connection conn = map.remove(waypoint);
++        if (conn != null) conn.disconnect();
+     }
+ 
++    // Note: this should be called on the 'player'
+     public void addPlayer(ServerPlayer player) {
+-        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking) ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(this.level, "Cannot add player to waypoints off-main"); // DivineMC - Parallel world ticking
+-        this.players.add(player);
++        if (!players.contains(player)) players.add(player);
+ 
+-        for (WaypointTransmitter waypointTransmitter : this.waypoints) {
+-            this.createConnection(player, waypointTransmitter);
++        if (isLocatorBarDisabled()) return;
++        for (WaypointTransmitter waypoint : waypoints) {
++            createConnection(player, waypoint);
+         }
+ 
+         if (player.isTransmittingWaypoint()) {
+-            this.trackWaypoint((WaypointTransmitter)player);
++            trackWaypoint(player);
+         }
+     }
+ 
+-    public void updatePlayer(ServerPlayer player) {
+-        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking) ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(this.level, "Cannot update player for waypoints off-main"); // DivineMC - Parallel world ticking
+-        Map<WaypointTransmitter, WaypointTransmitter.Connection> map = this.connections.row(player);
+-        SetView<WaypointTransmitter> set = Sets.difference(this.waypoints, map.keySet());
++    // Note: this should be called on the 'player'
++    public void updatePlayer(@NotNull ServerPlayer player) {
++        if (isLocatorBarDisabled()) return;
++        player.scheduleToOrRun(() -> {
++            final Object2ObjectMap<WaypointTransmitter, WaypointTransmitter.Connection> map = player.canvas$activeWaypoints;
++            final CallbackHolder[] callbackHolders = new CallbackHolder[map.size()];
++
++            int idx = 0;
++            for (Map.Entry<WaypointTransmitter, WaypointTransmitter.Connection> entry : map.object2ObjectEntrySet()) {
++                CallbackHolder callbackHolder = updateConnection(player, entry.getKey(), entry.getValue());
++                if (callbackHolder != null) {
++                    callbackHolders[idx] = callbackHolder;
++                    idx++;
++                }
++            }
+ 
+-        for (Entry<WaypointTransmitter, WaypointTransmitter.Connection> entry : ImmutableSet.copyOf(map.entrySet())) {
+-            this.updateConnection(player, entry.getKey(), entry.getValue());
+-        }
++            for (final CallbackHolder callbackHolder : callbackHolders) {
++                if (callbackHolder == null) break;
++                callbackHolder.call.run();
++            }
+ 
+-        for (WaypointTransmitter waypointTransmitter : set) {
+-            this.createConnection(player, waypointTransmitter);
+-        }
++            for (WaypointTransmitter waypoint : waypoints) {
++                if (!map.containsKey(waypoint)) {
++                    createConnection(player, waypoint);
++                }
++            }
++        });
+     }
+ 
+-    public void removePlayer(ServerPlayer player) {
+-        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking) ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(this.level, "Cannot remove player from waypoints off-main"); // DivineMC - Parallel world ticking
+-        this.connections.row(player).values().removeIf(connection -> {
+-            connection.disconnect();
+-            return true;
+-        });
+-        this.untrackWaypoint((WaypointTransmitter)player);
+-        this.players.remove(player);
++    // Note: this should be called on the 'player'
++    public void removePlayer(@NotNull ServerPlayer player) {
++        breakConnection(player);
++
++        untrackWaypoint(player);
++        players.remove(player);
+     }
+ 
+     public void breakAllConnections() {
+-        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking)  ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(this.level, "Cannot break all waypoint connections off-main"); // DivineMC - Parallel world ticking
+-        this.connections.values().forEach(WaypointTransmitter.Connection::disconnect);
+-        this.connections.clear();
++        for (ServerPlayer player : players) {
++            player.scheduleToOrRun(() -> {
++                breakConnection(player);
++            });
++        }
++    }
++
++    // Note: this should be scheduled on the 'player'
++    private static void breakConnection(@NotNull ServerPlayer player) {
++        TickThread.ensureTickThread(player, "Cannot update break connection off owning thread of player");
++        final Object2ObjectMap<WaypointTransmitter, WaypointTransmitter.Connection> map = player.canvas$activeWaypoints;
++        for (WaypointTransmitter.Connection conn : map.values()) {
++            conn.disconnect();
++        }
++        map.clear();
+     }
+ 
+     public void remakeConnections(WaypointTransmitter waypoint) {
+-        for (ServerPlayer serverPlayer : this.players) {
+-            this.createConnection(serverPlayer, waypoint);
++        for (ServerPlayer player : players) {
++            player.scheduleToOrRun(() -> {
++                createConnection(player, waypoint);
++            });
+         }
+     }
+ 
+     public Set<WaypointTransmitter> transmitters() {
+-        return this.waypoints;
++        return new HashSet<>(waypoints);
+     }
+ 
+-    private static boolean isLocatorBarEnabledFor(ServerPlayer player) {
+-        return player.level().getGameRules().getBoolean(GameRules.RULE_LOCATOR_BAR); // Paper - per world gamerules
++    // Note: this should be scheduled on 'player'
++    private void createConnection(ServerPlayer player, WaypointTransmitter waypoint) {
++        if (player == waypoint) return;
++        TickThread.ensureTickThread(player, "Cannot create waypoint connection off owning thread of player");
++
++        final Object2ObjectMap<WaypointTransmitter, WaypointTransmitter.Connection> map = player.canvas$activeWaypoints;
++
++        waypoint.makeWaypointConnectionWith(player).ifPresentOrElse(connection -> {
++            map.put(waypoint, connection);
++            connection.connect();
++        }, () -> {
++            WaypointTransmitter.Connection existing = map.remove(waypoint);
++            if (existing != null) existing.disconnect();
++        });
+     }
+ 
+-    private void createConnection(ServerPlayer player, WaypointTransmitter waypoint) {
+-        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking) ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(this.level, "Cannot create waypoint connections off-main"); // DivineMC - Parallel world ticking
+-        if (player != waypoint) {
+-            if (isLocatorBarEnabledFor(player)) {
+-                waypoint.makeWaypointConnectionWith(player).ifPresentOrElse(connection -> {
+-                    this.connections.put(player, waypoint, connection);
+-                    connection.connect();
+-                }, () -> {
+-                    WaypointTransmitter.Connection connection = this.connections.remove(player, waypoint);
+-                    if (connection != null) {
+-                        connection.disconnect();
+-                    }
+-                });
+-            }
++    // Note: this should be scheduled on 'player'
++    private @Nullable CallbackHolder updateConnection(ServerPlayer player, WaypointTransmitter waypoint, WaypointTransmitter.Connection connection) {
++        if (player == waypoint) return null;
++        TickThread.ensureTickThread(player, "Cannot update waypoint connection off owning thread of player");
++
++        final Object2ObjectMap<WaypointTransmitter, WaypointTransmitter.Connection> map = player.canvas$activeWaypoints;
++
++        if (!connection.isBroken()) {
++            connection.update();
++        } else {
++            CallbackHolder ref = new CallbackHolder();
++            waypoint.makeWaypointConnectionWith(player).ifPresentOrElse(newConn -> ref.call = () -> {
++                newConn.connect();
++                map.put(waypoint, newConn);
++            }, () -> ref.call = () -> {
++                connection.disconnect();
++                map.remove(waypoint);
++            });
++            return ref;
+         }
++        return null;
+     }
+ 
+-    private void updateConnection(ServerPlayer player, WaypointTransmitter waypoint, WaypointTransmitter.Connection connection) {
+-        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking) ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(this.level, "Cannot update waypoint connection off-main"); // DivineMC - Parallel world ticking
+-        if (player != waypoint) {
+-            if (isLocatorBarEnabledFor(player)) {
+-                if (!connection.isBroken()) {
+-                    connection.update();
+-                } else {
+-                    waypoint.makeWaypointConnectionWith(player).ifPresentOrElse(connection1 -> {
+-                        connection1.connect();
+-                        this.connections.put(player, waypoint, connection1);
+-                    }, () -> {
+-                        connection.disconnect();
+-                        this.connections.remove(player, waypoint);
+-                    });
+-                }
+-            }
+-        }
++    public ServerLevel getWorld() {
++        return world;
++    }
++
++    private static class CallbackHolder {
++        /**
++         * In usage of this, if the class != null, then this field should be non-null
++         */
++        Runnable call;
+     }
+ }

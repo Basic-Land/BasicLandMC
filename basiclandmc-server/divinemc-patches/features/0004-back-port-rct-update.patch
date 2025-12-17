@@ -1,0 +1,94 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Tue, 25 Nov 2025 20:37:51 +0100
+Subject: [PATCH] back-port-rct-update
+
+
+diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
+index d308a0447bba1ccd7834823b8d70f3f5980490c5..e456f65ee20eaf9ed08af1820b43aa2b4f041789 100644
+--- a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
++++ b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
+@@ -27,6 +27,7 @@ import net.minecraft.world.level.storage.DimensionDataStorage;
+ import net.minecraft.world.level.storage.LevelStorageSource;
+ import org.bxteam.divinemc.config.DivineConfig;
+ import org.bxteam.divinemc.util.NamedAgnosticThreadFactory;
++import org.jetbrains.annotations.NotNull;
+ import org.slf4j.Logger;
+ 
+ import java.util.ArrayList;
+@@ -48,15 +49,17 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+         super(level, levelStorageAccess, fixerUpper, structureManager, dispatcher, generator, viewDistance, simulationDistance, sync, progressListener, chunkStatusListener, overworldDataStorage);
+     }
+ 
+-    public void execute(CompletableFuture<Void> spawns, final LevelChunk[] raw) {
++    @Override
++    protected void iterateTickingChunksFaster(final @NotNull CompletableFuture<Void> spawns) {
++        final ServerLevel world = this.level;
++        final int randomTickSpeed = world.getGameRules().getInt(GameRules.RULE_RANDOMTICKING);
++        final LevelChunk[] raw = world.moonrise$getEntityTickingChunks().toArray(new LevelChunk[0]);
++
+         final TickPair tickPair = computePlayerRegionsParallel();
+         final RegionData[] regions = tickPair.regions();
+-        final int regionCount = regions.length;
+ 
+         ActivationRange.activateEntities(level); // Paper - EAR
+-
+-        final int randomTickSpeed = level.getGameRules().getInt(GameRules.RULE_RANDOMTICKING);
+-        ObjectArrayList<CompletableFuture<LongOpenHashSet>> ticked = new ObjectArrayList<>(regionCount);
++        ObjectArrayList<CompletableFuture<LongOpenHashSet>> ticked = new ObjectArrayList<>(regions.length);
+ 
+         for (final RegionData region : regions) {
+             if (region == null || region.isEmpty()) {
+@@ -224,21 +227,19 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+     }
+ 
+     private void tickEntity(Entity entity) {
+-        if (!entity.isRemoved()) {
+-            if (!level.tickRateManager().isEntityFrozen(entity)) {
+-                entity.checkDespawn();
+-                // Paper - rewrite chunk system
+-                Entity vehicle = entity.getVehicle();
+-                if (vehicle != null) {
+-                    if (!vehicle.isRemoved() && vehicle.hasPassenger(entity)) {
+-                        return;
+-                    }
+-
+-                    entity.stopRiding();
++        if (!entity.isRemoved() && !entity.moonrise$isUpdatingSectionStatus() && !level.tickRateManager().isEntityFrozen(entity)) {
++            entity.checkDespawn();
++            // Paper - rewrite chunk system
++            Entity vehicle = entity.getVehicle();
++            if (vehicle != null) {
++                if (!vehicle.isRemoved() && vehicle.hasPassenger(entity)) {
++                    return;
+                 }
+ 
+-                level.guardEntityTick(level::tickNonPassenger, entity);
++                entity.stopRiding();
+             }
++
++            level.guardEntityTick(level::tickNonPassenger, entity);
+         }
+     }
+ }
+diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
+index 7458803cbde776fac0a340b6f96aeb10be65c47e..f18cffa721ef5deecc25d252fc989c56cc28f539 100644
+--- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
++++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
+@@ -231,6 +231,8 @@ public class DivineConfig {
+         public static boolean enableAsyncSpawning = true;
+         public static boolean asyncNaturalSpawn = true;
+ 
++        public static boolean RCTorPWT = false;
++
+         public static void load() {
+             parallelWorldTicking();
+             regionizedChunkTicking();
+@@ -239,6 +241,7 @@ public class DivineConfig {
+             asyncJoinSettings();
+             asyncChunkSending();
+             asyncMobSpawning();
++            RCTorPWT = enableRegionizedChunkTicking || enableParallelWorldTicking;
+         }
+ 
+         private static void parallelWorldTicking() {

@@ -1,0 +1,102 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Tue, 25 Nov 2025 20:37:02 +0100
+Subject: [PATCH] back-port-rct-update
+
+
+diff --git a/net/minecraft/server/level/ServerChunkCache.java b/net/minecraft/server/level/ServerChunkCache.java
+index 71b0b72c0c65fada33bdf732aa8b366a6ab8e472..701596b7b79008cb0540098c917b295d594d3493 100644
+--- a/net/minecraft/server/level/ServerChunkCache.java
++++ b/net/minecraft/server/level/ServerChunkCache.java
+@@ -157,45 +157,35 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+     // Paper end - rewrite chunk system
+     // Paper start - chunk tick iteration optimisations
+     private final ca.spottedleaf.moonrise.common.util.SimpleThreadUnsafeRandom shuffleRandom = new ca.spottedleaf.moonrise.common.util.SimpleThreadUnsafeRandom(0L);
+-    private void iterateTickingChunksFaster(final CompletableFuture<Void> spawns) { // DivineMC - Regionized Chunk Ticking
++    protected void iterateTickingChunksFaster(final CompletableFuture<Void> spawns) { // DivineMC - private -> protected Regionized Chunk Ticking
+         final ServerLevel world = this.level;
+         final int randomTickSpeed = world.getGameRules().getInt(GameRules.RULE_RANDOMTICKING);
+ 
+         // TODO check on update: impl of forEachBlockTickingChunk will only iterate ENTITY ticking chunks!
+         // TODO check on update: consumer just runs tickChunk
+-        final ca.spottedleaf.moonrise.common.list.ReferenceList<LevelChunk> entityTickingChunks = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)world).moonrise$getEntityTickingChunks(); // DivineMC - Regionized Chunk Ticking
++        final ca.spottedleaf.moonrise.common.list.ReferenceList<net.minecraft.world.level.chunk.LevelChunk> entityTickingChunks = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)world).moonrise$getEntityTickingChunks();
+ 
+         // note: we can use the backing array here because:
+         // 1. we do not care about new additions
+         // 2. _removes_ are impossible at this stage in the tick
+-        final LevelChunk[] raw = entityTickingChunks.toArray(new LevelChunk[0]); // DivineMC - use toArray instead of getRawDataUnchecked this way is safe and doesn't have performance impact
++        final LevelChunk[] raw = entityTickingChunks.getRawDataUnchecked();
+         final int size = entityTickingChunks.size();
+ 
+-        // DivineMC start - Regionized Chunk Ticking
+-        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableRegionizedChunkTicking) {
+-            if (this instanceof org.bxteam.divinemc.async.rct.RegionizedChunkTicking rct) {
+-                rct.execute(spawns, raw);
+-            }
+-        } else {
+-            java.util.Objects.checkFromToIndex(0, size, raw.length);
+-            for (int i = 0; i < size; ++i) {
+-                world.tickChunk(raw[i], randomTickSpeed);
+-
+-                // call mid-tick tasks for chunk system
+-                if ((i & 7) == 0) {
+-                    // DivineMC start - Parallel world ticking
+-                    if (!org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking) {
+-                        ((ca.spottedleaf.moonrise.patches.chunk_system.server.ChunkSystemMinecraftServer) this.level.getServer()).moonrise$executeMidTickTasks();
+-                        continue;
+-                    }
+-                    // DivineMC end - Parallel world ticking
+-                }
+-            }
++        java.util.Objects.checkFromToIndex(0, size, raw.length);
++        for (int i = 0; i < size; ++i) {
++            world.tickChunk(raw[i], randomTickSpeed);
+ 
+-            if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.asyncNaturalSpawn) {
+-                spawns.join();
++            // call mid-tick tasks for chunk system
++            if ((i & 7) == 0) {
++                ((ca.spottedleaf.moonrise.patches.chunk_system.server.ChunkSystemMinecraftServer)this.level.getServer()).moonrise$executeMidTickTasks();
++                continue;
+             }
+         }
++
++        // DivineMC start - Regionized Chunk Ticking
++        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.asyncNaturalSpawn) {
++            spawns.join();
++        }
+         // DivineMC end - Regionized Chunk Ticking
+     }
+     // Paper end - chunk tick iteration optimisations
+diff --git a/net/minecraft/world/level/entity/EntityTickList.java b/net/minecraft/world/level/entity/EntityTickList.java
+index cc47fbb5b95370aadcd43ea296e46a0aedd925f7..42cb7885a0073d872676e32cf6b1253a7166a561 100644
+--- a/net/minecraft/world/level/entity/EntityTickList.java
++++ b/net/minecraft/world/level/entity/EntityTickList.java
+@@ -32,7 +32,7 @@ public class EntityTickList {
+         if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking) ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(entity, "Asynchronous entity ticklist addition"); // DivineMC - Parallel world ticking
+         this.ensureActiveIsNotIterated();
+         // DivineMC start - Parallel world ticking
+-        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking) {
++        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.RCTorPWT) {
+             synchronized (this.entities) {
+                 this.entities.add(entity);
+             }
+@@ -46,7 +46,7 @@ public class EntityTickList {
+         if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking) ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(entity, "Asynchronous entity ticklist removal"); // DivineMC - Parallel world ticking
+         this.ensureActiveIsNotIterated();
+         // DivineMC start - Parallel world ticking
+-        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking) {
++        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.RCTorPWT) {
+             synchronized (this.entities) {
+                 if (this.entities.contains(entity)) {
+                     this.entities.remove(entity);
+@@ -60,7 +60,7 @@ public class EntityTickList {
+ 
+     public boolean contains(Entity entity) {
+         // DivineMC start - Parallel world ticking
+-        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.enableParallelWorldTicking) {
++        if (org.bxteam.divinemc.config.DivineConfig.AsyncCategory.RCTorPWT) {
+             synchronized (this.entities) {
+                 return this.entities.contains(entity);
+             }
