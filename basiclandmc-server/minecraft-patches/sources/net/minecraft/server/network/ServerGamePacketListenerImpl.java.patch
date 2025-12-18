@@ -9,3 +9,13 @@
              for (ServerLevel serverLevel : this.server.getAllLevels()) {
                  Entity entity = packet.getEntity(serverLevel);
                  if (entity != null) {
+@@ -2641,7 +_,8 @@
+             // CraftBukkit end
+             && !org.bxteam.divinemc.config.DivineConfig.NetworkCategory.disableDisconnectSpam // DivineMC - Option to disable disconnect.spam
+             && !this.server.getPlayerList().isOp(this.player.getGameProfile())
+-            && !this.server.isSingleplayerOwner(this.player.getGameProfile())) {
++            && !this.server.isSingleplayerOwner(this.player.getGameProfile())
++            && !this.player.getBukkitEntity().hasPermission("chatspam")) { // BasicLandMC - Add permission to bypass spam protection
+             this.disconnectAsync(Component.translatable("disconnect.spam"), org.bukkit.event.player.PlayerKickEvent.Cause.SPAM); // Paper - kick event cause & add proper async disconnect
+         }
+     }
