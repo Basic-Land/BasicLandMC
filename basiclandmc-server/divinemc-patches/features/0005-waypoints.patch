@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Thu, 18 Dec 2025 20:16:17 +0100
+Subject: [PATCH] waypoints
+
+
+diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
+index f18cffa721ef5deecc25d252fc989c56cc28f539..c2f94ab584842f0fb388475d381f4c7f1e68cccc 100644
+--- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
++++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
+@@ -231,6 +231,8 @@ public class DivineConfig {
+         public static boolean enableAsyncSpawning = true;
+         public static boolean asyncNaturalSpawn = true;
+ 
++        public static boolean waypoints = false; // BasiclandMC optimize defaults
++
+         public static boolean RCTorPWT = false;
+ 
+         public static void load() {
+@@ -241,6 +243,7 @@ public class DivineConfig {
+             asyncJoinSettings();
+             asyncChunkSending();
+             asyncMobSpawning();
++            waypoints();
+             RCTorPWT = enableRegionizedChunkTicking || enableParallelWorldTicking;
+         }
+ 
+@@ -363,6 +366,11 @@ public class DivineConfig {
+             asyncNaturalSpawn = getBoolean(ConfigCategory.ASYNC.key("async-ticking-of-natural-spawns"), asyncNaturalSpawn,
+                 "Enables offloading of natural spawning to a different thread");
+         }
++
++        private static void waypoints() {
++            waypoints = getBoolean(ConfigCategory.ASYNC.key("waypoints.enable"), waypoints,
++                "Fully enables or disables waypoints");
++        }
+     }
+ 
+     public static class PerformanceCategory {

@@ -1,0 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Thu, 18 Dec 2025 20:16:31 +0100
+Subject: [PATCH] waypoints
+
+
+diff --git a/net/minecraft/server/waypoints/ServerWaypointManager.java b/net/minecraft/server/waypoints/ServerWaypointManager.java
+index 839f6b7696ef85314da185bedba7cfc5870c314a..b90fb44dc30d9b0558ddeb388779c952c2e8b3e4 100644
+--- a/net/minecraft/server/waypoints/ServerWaypointManager.java
++++ b/net/minecraft/server/waypoints/ServerWaypointManager.java
+@@ -116,7 +116,7 @@ public class ServerWaypointManager implements WaypointManager<WaypointTransmitte
+     }
+ 
+     private static boolean isLocatorBarEnabledFor(ServerPlayer player) {
+-        return player.level().getGameRules().getBoolean(GameRules.RULE_LOCATOR_BAR); // Paper - per world gamerules
++        return player.level().getGameRules().getBoolean(GameRules.RULE_LOCATOR_BAR) && org.bxteam.divinemc.config.DivineConfig.AsyncCategory.waypoints; // Paper - per world gamerules
+     }
+ 
+     private void createConnection(ServerPlayer player, WaypointTransmitter waypoint) {
