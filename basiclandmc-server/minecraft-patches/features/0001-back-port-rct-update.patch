@@ -69,6 +69,43 @@ index 71b0b72c0c65fada33bdf732aa8b366a6ab8e472..701596b7b79008cb0540098c917b295d
          // DivineMC end - Regionized Chunk Ticking
      }
      // Paper end - chunk tick iteration optimisations
+diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
+index bae2cf89e9bc71a360fe471f7d3e703705488f3a..46c776df0cd8a6b28efa6f5aaced98a8ac4068ac 100644
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -393,7 +393,7 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+     private int sectionX = Integer.MIN_VALUE;
+     private int sectionY = Integer.MIN_VALUE;
+     private int sectionZ = Integer.MIN_VALUE;
+-    private boolean updatingSectionStatus;
++    private final java.util.concurrent.atomic.AtomicBoolean updatingSectionStatus = new java.util.concurrent.atomic.AtomicBoolean(false);
+ 
+     @Override
+     public final boolean moonrise$isHardColliding() {
+@@ -452,12 +452,12 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+ 
+     @Override
+     public final boolean moonrise$isUpdatingSectionStatus() {
+-        return this.updatingSectionStatus;
++        return this.updatingSectionStatus.get();
+     }
+ 
+     @Override
+     public final void moonrise$setUpdatingSectionStatus(final boolean to) {
+-        this.updatingSectionStatus = to;
++        this.updatingSectionStatus.set(to);
+     }
+ 
+     @Override
+@@ -5028,7 +5028,7 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+ 
+     public final void setPosRaw(double x, double y, double z, boolean forceBoundingBoxUpdate) {
+         // Paper start - rewrite chunk system
+-        if (this.updatingSectionStatus) {
++        if (this.updatingSectionStatus.get()) {
+             LOGGER.error(
+                 "Refusing to update position for entity " + this + " to position " + new Vec3(x, y, z)
+                     + " since it is processing a section status update", new Throwable()
 diff --git a/net/minecraft/world/level/entity/EntityTickList.java b/net/minecraft/world/level/entity/EntityTickList.java
 index cc47fbb5b95370aadcd43ea296e46a0aedd925f7..42cb7885a0073d872676e32cf6b1253a7166a561 100644
 --- a/net/minecraft/world/level/entity/EntityTickList.java

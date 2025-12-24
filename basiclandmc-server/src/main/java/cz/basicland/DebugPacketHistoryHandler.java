@@ -63,7 +63,7 @@ public class DebugPacketHistoryHandler extends ChannelInboundHandlerAdapter {
 
     private String summarize(Object msg) {
         if (msg == null) return "null";
-        String cls = msg.getClass().getSimpleName();
+        String cls = msg.getClass().getName();
         try {
             // safe length info for common Netty types
             if (msg instanceof io.netty.buffer.ByteBuf buf) {

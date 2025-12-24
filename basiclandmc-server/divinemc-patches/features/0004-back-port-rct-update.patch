@@ -5,7 +5,7 @@ Subject: [PATCH] back-port-rct-update
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
-index d308a0447bba1ccd7834823b8d70f3f5980490c5..e456f65ee20eaf9ed08af1820b43aa2b4f041789 100644
+index d308a0447bba1ccd7834823b8d70f3f5980490c5..2dde23027895690d37dd32862124f174780c4958 100644
 --- a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
 +++ b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
 @@ -27,6 +27,7 @@ import net.minecraft.world.level.storage.DimensionDataStorage;
@@ -39,7 +39,28 @@ index d308a0447bba1ccd7834823b8d70f3f5980490c5..e456f65ee20eaf9ed08af1820b43aa2b
  
          for (final RegionData region : regions) {
              if (region == null || region.isEmpty()) {
-@@ -224,21 +227,19 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+@@ -74,19 +77,15 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+ 
+     private CompletableFuture<LongOpenHashSet> tick(RegionData region, int randomTickSpeed) {
+         return CompletableFuture.supplyAsync(() -> {
+-            ObjectArrayList<LevelChunk> regionChunks = new ObjectArrayList<>(region.chunks().size());
+             LongOpenHashSet regionChunksIDs = new LongOpenHashSet(region.chunks().size());
+             for (long key : region.chunks()) {
+                 LevelChunk chunk = fullChunks.get(key);
+                 if (chunk != null) {
+-                    regionChunks.add(chunk);
++                    level.tickChunk(chunk, randomTickSpeed);
+                     regionChunksIDs.add(key);
+                 }
+             }
+ 
+-            for (LevelChunk chunk : regionChunks) {
+-                level.tickChunk(chunk, randomTickSpeed);
+-            }
+             for (Entity entity : region.entities()) {
+                 tickEntity(entity);
+             }
+@@ -224,21 +223,22 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
      }
  
      private void tickEntity(Entity entity) {
@@ -54,7 +75,7 @@ index d308a0447bba1ccd7834823b8d70f3f5980490c5..e456f65ee20eaf9ed08af1820b43aa2b
 -                    }
 -
 -                    entity.stopRiding();
-+        if (!entity.isRemoved() && !entity.moonrise$isUpdatingSectionStatus() && !level.tickRateManager().isEntityFrozen(entity)) {
++        if (!entity.isRemoved() && !level.tickRateManager().isEntityFrozen(entity)) {
 +            entity.checkDespawn();
 +            // Paper - rewrite chunk system
 +            Entity vehicle = entity.getVehicle();
@@ -65,8 +86,11 @@ index d308a0447bba1ccd7834823b8d70f3f5980490c5..e456f65ee20eaf9ed08af1820b43aa2b
  
 -                level.guardEntityTick(level::tickNonPassenger, entity);
 +                entity.stopRiding();
++            }
++            if (entity.moonrise$isUpdatingSectionStatus()) {
++                LOGGER.info("Skipping tick for entity {} as it is in the process of updating section status", entity);
++                return;
              }
-+
 +            level.guardEntityTick(level::tickNonPassenger, entity);
          }
      }
