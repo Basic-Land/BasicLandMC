@@ -5,7 +5,7 @@ Subject: [PATCH] back-port-rct-update
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
-index d308a0447bba1ccd7834823b8d70f3f5980490c5..a405888b59985f50fc77c674c00970d7d10861da 100644
+index d308a0447bba1ccd7834823b8d70f3f5980490c5..fd2b76ee98cc1eccd4d0df90d66553b845ea04d0 100644
 --- a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
 +++ b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
 @@ -27,6 +27,7 @@ import net.minecraft.world.level.storage.DimensionDataStorage;
@@ -60,7 +60,7 @@ index d308a0447bba1ccd7834823b8d70f3f5980490c5..a405888b59985f50fc77c674c00970d7
              for (Entity entity : region.entities()) {
                  tickEntity(entity);
              }
-@@ -224,21 +223,19 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+@@ -224,21 +223,23 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
      }
  
      private void tickEntity(Entity entity) {
@@ -75,7 +75,11 @@ index d308a0447bba1ccd7834823b8d70f3f5980490c5..a405888b59985f50fc77c674c00970d7
 -                    }
 -
 -                    entity.stopRiding();
-+        if (!entity.isRemoved() && !entity.moonrise$isUpdatingSectionStatus() && !level.tickRateManager().isEntityFrozen(entity)) {
++        if (!entity.isRemoved() && !level.tickRateManager().isEntityFrozen(entity)) {
++            if (entity.moonrise$isUpdatingSectionStatus()) {
++                LOGGER.info("Skipping tick for entity {} as it is in the process of updating section status", entity);
++                return;
++            }
 +            entity.checkDespawn();
 +            // Paper - rewrite chunk system
 +            Entity vehicle = entity.getVehicle();
@@ -93,7 +97,7 @@ index d308a0447bba1ccd7834823b8d70f3f5980490c5..a405888b59985f50fc77c674c00970d7
      }
  }
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index 7458803cbde776fac0a340b6f96aeb10be65c47e..f18cffa721ef5deecc25d252fc989c56cc28f539 100644
+index 7458803cbde776fac0a340b6f96aeb10be65c47e..26c16ccdba92b1f4218d24c5f6d9beece679dc78 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 @@ -231,6 +231,8 @@ public class DivineConfig {
@@ -113,3 +117,12 @@ index 7458803cbde776fac0a340b6f96aeb10be65c47e..f18cffa721ef5deecc25d252fc989c56
          }
  
          private static void parallelWorldTicking() {
+@@ -269,7 +272,7 @@ public class DivineConfig {
+             regionizedChunkTickingExecutorThreadPriority = getInt(ConfigCategory.ASYNC.key("regionized-chunk-ticking.executor-thread-priority"), regionizedChunkTickingExecutorThreadPriority,
+                 "Configures the thread priority of the executor");
+ 
+-            if (regionizedChunkTickingExecutorThreadCount < 1 || regionizedChunkTickingExecutorThreadCount > 10) {
++            if (regionizedChunkTickingExecutorThreadCount < 1 || regionizedChunkTickingExecutorThreadCount > 12) {
+                 LOGGER.warn("Invalid regionized chunk ticking thread count: {}, resetting to default (4)", regionizedChunkTickingExecutorThreadCount);
+                 regionizedChunkTickingExecutorThreadCount = 4;
+             }
