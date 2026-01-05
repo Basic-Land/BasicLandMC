@@ -5,7 +5,7 @@ Subject: [PATCH] back-port-rct-update
 
 
 diff --git a/net/minecraft/server/level/ServerChunkCache.java b/net/minecraft/server/level/ServerChunkCache.java
-index 71b0b72c0c65fada33bdf732aa8b366a6ab8e472..701596b7b79008cb0540098c917b295d594d3493 100644
+index 71b0b72c0c65fada33bdf732aa8b366a6ab8e472..d7ee3b80f540c68c4e317d262d93ca06fc04bdde 100644
 --- a/net/minecraft/server/level/ServerChunkCache.java
 +++ b/net/minecraft/server/level/ServerChunkCache.java
 @@ -157,45 +157,35 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
@@ -69,6 +69,15 @@ index 71b0b72c0c65fada33bdf732aa8b366a6ab8e472..701596b7b79008cb0540098c917b295d
          // DivineMC end - Regionized Chunk Ticking
      }
      // Paper end - chunk tick iteration optimisations
+@@ -645,7 +635,7 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+             spawns = CompletableFuture.runAsync(() -> naturalSpawn(filteredSpawningCategories, timeInhabited), org.bxteam.divinemc.async.rct.RegionizedChunkTicking.REGION_EXECUTOR);
+         } else {
+             naturalSpawn(filteredSpawningCategories, timeInhabited);
+-            spawns = new CompletableFuture<>();
++            spawns = CompletableFuture.completedFuture(null);
+         }
+         // DivineMC end - Regionized Chunk Ticking
+ 
 diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
 index bae2cf89e9bc71a360fe471f7d3e703705488f3a..46c776df0cd8a6b28efa6f5aaced98a8ac4068ac 100644
 --- a/net/minecraft/world/entity/Entity.java
