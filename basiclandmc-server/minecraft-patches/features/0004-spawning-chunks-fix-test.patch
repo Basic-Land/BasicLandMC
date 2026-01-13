@@ -1,0 +1,193 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Sat, 10 Jan 2026 22:58:49 +0100
+Subject: [PATCH] spawning-chunks-fix-test
+
+
+diff --git a/net/minecraft/server/level/ChunkMap.java b/net/minecraft/server/level/ChunkMap.java
+index a05d37a23e514fc2959d9390e29b00488382f42e..dd2b363d054a94bf2e09239919317e9068baa467 100644
+--- a/net/minecraft/server/level/ChunkMap.java
++++ b/net/minecraft/server/level/ChunkMap.java
+@@ -1,5 +1,7 @@
+ package net.minecraft.server.level;
+ 
++import ca.spottedleaf.moonrise.common.list.ReferenceList;
++import ca.spottedleaf.moonrise.patches.chunk_tick_iteration.ChunkTickServerLevel;
+ import com.google.common.collect.ImmutableList;
+ import com.google.common.collect.Iterables;
+ import com.google.common.collect.Lists;
+@@ -729,22 +731,24 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
+     }
+     // Paper end - optimise chunk tick iteration
+ 
+-    void collectSpawningChunks(List<LevelChunk> output) {
+-        final ca.spottedleaf.moonrise.common.list.ReferenceList<net.minecraft.world.level.chunk.LevelChunk> tickingChunks = ((ca.spottedleaf.moonrise.patches.chunk_tick_iteration.ChunkTickServerLevel)this.level).moonrise$getPlayerTickingChunks();
++    synchronized void collectSpawningChunks(List<LevelChunk> output) {
++        final ReferenceList<LevelChunk> tickingChunks;
++        synchronized (tickingChunks = this.level.moonrise$getPlayerTickingChunks()) {
++            final LevelChunk[] raw = tickingChunks.toArray(new LevelChunk[0]); // DivineMC - Regionized Chunk Ticking - sync fix
++            final int size = tickingChunks.size();
+ 
+-        final LevelChunk[] raw = tickingChunks.toArray(new LevelChunk[0]); // DivineMC - Regionized Chunk Ticking - sync fix
+-        final int size = tickingChunks.size();
++            Objects.checkFromToIndex(0, size, raw.length);
++            for (int i = 0; i < size; ++i) {
++                final LevelChunk levelChunk = raw[i];
+ 
+-        Objects.checkFromToIndex(0, size, raw.length);
+-        for (int i = 0; i < size; ++i) {
+-            final LevelChunk levelChunk = raw[i];
++                if (!this.isChunkNearPlayer(this, levelChunk.getPos(), levelChunk)) {
++                    continue;
++                }
+ 
+-            if (!this.isChunkNearPlayer((ChunkMap)(Object)this, levelChunk.getPos(), levelChunk)) {
+-                continue;
++                output.add(levelChunk);
+             }
+-
+-            output.add(levelChunk);
+         }
++
+     }
+ 
+     void forEachBlockTickingChunk(Consumer<LevelChunk> action) {
+diff --git a/net/minecraft/server/level/ServerLevel.java b/net/minecraft/server/level/ServerLevel.java
+index d5a0c2d6344de8bd57d56cff0e264df804772e84..7a7ac446b7239d6ba4546753e43331b62e36d702 100644
+--- a/net/minecraft/server/level/ServerLevel.java
++++ b/net/minecraft/server/level/ServerLevel.java
+@@ -499,74 +499,85 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+     }
+     // Paper end - rewrite chunk system
+     // Paper start - chunk tick iteration
++    private final Object lock = new Object();
+     private final ca.spottedleaf.moonrise.common.list.ReferenceList<LevelChunk> playerTickingChunks = new ca.spottedleaf.moonrise.common.list.ReferenceList<>(EMPTY_LEVEL_CHUNKS);
+     private final it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap playerTickingRequests = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
+ 
+     @Override
+-    public final ca.spottedleaf.moonrise.common.list.ReferenceList<LevelChunk> moonrise$getPlayerTickingChunks() {
+-        return this.playerTickingChunks;
++    public synchronized final ca.spottedleaf.moonrise.common.list.ReferenceList<LevelChunk> moonrise$getPlayerTickingChunks() {
++        synchronized (lock) {
++            return this.playerTickingChunks;
++        }
+     }
+ 
+     @Override
+-    public final void moonrise$markChunkForPlayerTicking(final LevelChunk chunk) {
+-        final ChunkPos pos = chunk.getPos();
+-        if (!this.playerTickingRequests.containsKey(ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(pos))) {
+-            return;
+-        }
++    public synchronized final void moonrise$markChunkForPlayerTicking(final LevelChunk chunk) {
++        synchronized (lock) {
++            final ChunkPos pos = chunk.getPos();
++            if (!this.playerTickingRequests.containsKey(ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(pos))) {
++                return;
++            }
+ 
+-        this.playerTickingChunks.add(chunk);
++            this.playerTickingChunks.add(chunk);
++        }
+     }
+ 
+     @Override
+-    public final void moonrise$removeChunkForPlayerTicking(final LevelChunk chunk) {
+-        this.playerTickingChunks.remove(chunk);
++    public synchronized final void moonrise$removeChunkForPlayerTicking(final LevelChunk chunk) {
++        synchronized (lock) {
++            this.playerTickingChunks.remove(chunk);
++        }
+     }
+ 
+     @Override
+-    public final void moonrise$addPlayerTickingRequest(final int chunkX, final int chunkZ) {
+-        ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread((ServerLevel)(Object)this, chunkX, chunkZ, "Cannot add ticking request async");
++    public synchronized final void moonrise$addPlayerTickingRequest(final int chunkX, final int chunkZ) {
++        synchronized (lock) {
++            ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread((ServerLevel) (Object) this, chunkX, chunkZ, "Cannot add ticking request async");
+ 
+-        final long chunkKey = ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(chunkX, chunkZ);
++            final long chunkKey = ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(chunkX, chunkZ);
+ 
+-        if (this.playerTickingRequests.addTo(chunkKey, 1) != 0) {
+-            // already added
+-            return;
+-        }
++            if (this.playerTickingRequests.addTo(chunkKey, 1) != 0) {
++                // already added
++                return;
++            }
+ 
+-        final ca.spottedleaf.moonrise.patches.chunk_system.scheduling.NewChunkHolder chunkHolder = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)(ServerLevel)(Object)this).moonrise$getChunkTaskScheduler()
+-            .chunkHolderManager.getChunkHolder(chunkKey);
++            final ca.spottedleaf.moonrise.patches.chunk_system.scheduling.NewChunkHolder chunkHolder = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) (ServerLevel) (Object) this).moonrise$getChunkTaskScheduler()
++                .chunkHolderManager.getChunkHolder(chunkKey);
+ 
+-        if (chunkHolder == null || !chunkHolder.isTickingReady()) {
+-            return;
+-        }
++            if (chunkHolder == null || !chunkHolder.isTickingReady()) {
++                return;
++            }
+ 
+-        this.playerTickingChunks.add((LevelChunk)chunkHolder.getCurrentChunk());
++            this.playerTickingChunks.add((LevelChunk) chunkHolder.getCurrentChunk());
++        }
+     }
+ 
+     @Override
+-    public final void moonrise$removePlayerTickingRequest(final int chunkX, final int chunkZ) {
+-        ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread((ServerLevel)(Object)this, chunkX, chunkZ, "Cannot remove ticking request async");
++    public synchronized final void moonrise$removePlayerTickingRequest(final int chunkX, final int chunkZ) {
++        synchronized (lock) {
++            ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread((ServerLevel) (Object) this, chunkX, chunkZ, "Cannot remove ticking request async");
+ 
+-        final long chunkKey = ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(chunkX, chunkZ);
+-        final int val = this.playerTickingRequests.addTo(chunkKey, -1);
++            final long chunkKey = ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(chunkX, chunkZ);
++            final int val = this.playerTickingRequests.addTo(chunkKey, -1);
+ 
+-        if (val <= 0) {
+-            throw new IllegalStateException("Negative counter");
+-        }
++            if (val <= 0) {
++                throw new IllegalStateException("Negative counter");
++            }
+ 
+-        if (val != 1) {
+-            // still has at least one request
+-            return;
+-        }
++            if (val != 1) {
++                // still has at least one request
++                return;
++            }
+ 
+-        final ca.spottedleaf.moonrise.patches.chunk_system.scheduling.NewChunkHolder chunkHolder = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)(ServerLevel)(Object)this).moonrise$getChunkTaskScheduler()
+-            .chunkHolderManager.getChunkHolder(chunkKey);
++            final ca.spottedleaf.moonrise.patches.chunk_system.scheduling.NewChunkHolder chunkHolder = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel) (ServerLevel) (Object) this).moonrise$getChunkTaskScheduler()
++                .chunkHolderManager.getChunkHolder(chunkKey);
+ 
+-        if (chunkHolder == null || !chunkHolder.isTickingReady()) {
+-            return;
+-        }
++            if (chunkHolder == null || !chunkHolder.isTickingReady()) {
++                return;
++            }
+ 
+-        this.playerTickingChunks.remove((LevelChunk)chunkHolder.getCurrentChunk());
++            this.playerTickingChunks.remove((LevelChunk) chunkHolder.getCurrentChunk());
++        }
+     }
+     // Paper end - chunk tick iteration
+ 
+@@ -1823,7 +1834,7 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
+     }
+ 
+     @Override
+-    public void sendBlockUpdated(BlockPos pos, BlockState oldState, BlockState newState, int flags) {
++    public synchronized void sendBlockUpdated(BlockPos pos, BlockState oldState, BlockState newState, int flags) {
+         if (this.isUpdatingNavigations) {
+             String string = "recursive call to sendBlockUpdated";
+             Util.logAndPauseIfInIde("recursive call to sendBlockUpdated", new IllegalStateException("recursive call to sendBlockUpdated"));
