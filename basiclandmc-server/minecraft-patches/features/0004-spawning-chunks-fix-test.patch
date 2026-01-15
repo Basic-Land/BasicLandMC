@@ -52,6 +52,25 @@ index a05d37a23e514fc2959d9390e29b00488382f42e..dd2b363d054a94bf2e09239919317e90
      }
  
      void forEachBlockTickingChunk(Consumer<LevelChunk> action) {
+diff --git a/net/minecraft/server/level/ServerChunkCache.java b/net/minecraft/server/level/ServerChunkCache.java
+index d7ee3b80f540c68c4e317d262d93ca06fc04bdde..fb77decd3cc54f487c987789f6faf2e6b2455535 100644
+--- a/net/minecraft/server/level/ServerChunkCache.java
++++ b/net/minecraft/server/level/ServerChunkCache.java
+@@ -886,7 +886,13 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+             if (serverChunkCache.runDistanceManagerUpdates()) {
+                 return true;
+             } else {
+-                return super.pollTask() | ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)serverChunkCache.level).moonrise$getChunkTaskScheduler().executeMainThreadTask();
++                boolean mainPolled = false;
++                try {
++                    mainPolled = super.pollTask();
++                } catch (java.util.NoSuchElementException ex) {
++                    // Queue was empty; ignore and continue to scheduler execution.
++                }
++                return mainPolled | ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)serverChunkCache.level).moonrise$getChunkTaskScheduler().executeMainThreadTask();
+             }
+             // Paper end - rewrite chunk system
+         }
 diff --git a/net/minecraft/server/level/ServerLevel.java b/net/minecraft/server/level/ServerLevel.java
 index d5a0c2d6344de8bd57d56cff0e264df804772e84..7a7ac446b7239d6ba4546753e43331b62e36d702 100644
 --- a/net/minecraft/server/level/ServerLevel.java
