@@ -1,0 +1,45 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Mon, 26 Jan 2026 21:58:58 +0100
+Subject: [PATCH] rct improvments
+
+
+diff --git a/net/minecraft/server/level/ServerPlayer.java b/net/minecraft/server/level/ServerPlayer.java
+index 963aaef7493e1e281882a9eeca72b1a08fe9cbe8..a22c70779239930627ef92df21e83148bb348e8d 100644
+--- a/net/minecraft/server/level/ServerPlayer.java
++++ b/net/minecraft/server/level/ServerPlayer.java
+@@ -65,7 +65,6 @@ import net.minecraft.network.protocol.game.ClientboundHorseScreenOpenPacket;
+ import net.minecraft.network.protocol.game.ClientboundHurtAnimationPacket;
+ import net.minecraft.network.protocol.game.ClientboundMerchantOffersPacket;
+ import net.minecraft.network.protocol.game.ClientboundOpenBookPacket;
+-import net.minecraft.network.protocol.game.ClientboundOpenScreenPacket;
+ import net.minecraft.network.protocol.game.ClientboundOpenSignEditorPacket;
+ import net.minecraft.network.protocol.game.ClientboundPlayerAbilitiesPacket;
+ import net.minecraft.network.protocol.game.ClientboundPlayerCombatEndPacket;
+@@ -432,6 +431,13 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+     private boolean ramBar = false; // Purpur - Implement rambar commands
+     public boolean smoothWorldTeleport; // DivineMC - Smooth teleport API
+     public boolean hasTickedAtLeastOnceInNewWorld = false; // DivineMC - Parallel world ticking
++    public final it.unimi.dsi.fastutil.longs.LongArrayList avgTickTimeNanos = new it.unimi.dsi.fastutil.longs.LongArrayList(100) {
++        @Override
++        public boolean add(long k) {
++            if (size() >= 100) removeLong(0);
++            return super.add(k);
++        }
++    }; // DivineMC - tick time averaging
+ 
+     // Paper start - rewrite chunk system
+     private ca.spottedleaf.moonrise.patches.chunk_system.player.RegionizedPlayerChunkLoader.PlayerChunkLoaderData chunkLoader;
+diff --git a/net/minecraft/world/level/entity/EntityTickList.java b/net/minecraft/world/level/entity/EntityTickList.java
+index 42cb7885a0073d872676e32cf6b1253a7166a561..49df4aa008a8f3bdbdc1ce0859e04933f2ffc14b 100644
+--- a/net/minecraft/world/level/entity/EntityTickList.java
++++ b/net/minecraft/world/level/entity/EntityTickList.java
+@@ -9,7 +9,7 @@ import javax.annotation.Nullable;
+ import net.minecraft.world.entity.Entity;
+ 
+ public class EntityTickList {
+-    public final ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet<net.minecraft.world.entity.Entity> entities = new ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet<>(); // Paper - rewrite chunk system
++    public final ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet<net.minecraft.world.entity.Entity> entities = new ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet<>(net.minecraft.world.entity.Entity.class); // Paper - rewrite chunk system
+ 
+     // DivineMC start - Parallel world ticking
+     @Nullable

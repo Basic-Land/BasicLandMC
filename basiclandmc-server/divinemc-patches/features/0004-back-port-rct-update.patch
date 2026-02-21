@@ -97,7 +97,7 @@ index d308a0447bba1ccd7834823b8d70f3f5980490c5..fd2b76ee98cc1eccd4d0df90d66553b8
      }
  }
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index 7458803cbde776fac0a340b6f96aeb10be65c47e..26c16ccdba92b1f4218d24c5f6d9beece679dc78 100644
+index 7458803cbde776fac0a340b6f96aeb10be65c47e..4ef152cfba4b2054681b06955cc49120c75bc9c2 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 @@ -231,6 +231,8 @@ public class DivineConfig {
@@ -117,12 +117,16 @@ index 7458803cbde776fac0a340b6f96aeb10be65c47e..26c16ccdba92b1f4218d24c5f6d9beec
          }
  
          private static void parallelWorldTicking() {
-@@ -269,7 +272,7 @@ public class DivineConfig {
+@@ -269,9 +272,9 @@ public class DivineConfig {
              regionizedChunkTickingExecutorThreadPriority = getInt(ConfigCategory.ASYNC.key("regionized-chunk-ticking.executor-thread-priority"), regionizedChunkTickingExecutorThreadPriority,
                  "Configures the thread priority of the executor");
  
 -            if (regionizedChunkTickingExecutorThreadCount < 1 || regionizedChunkTickingExecutorThreadCount > 10) {
-+            if (regionizedChunkTickingExecutorThreadCount < 1 || regionizedChunkTickingExecutorThreadCount > 12) {
-                 LOGGER.warn("Invalid regionized chunk ticking thread count: {}, resetting to default (4)", regionizedChunkTickingExecutorThreadCount);
-                 regionizedChunkTickingExecutorThreadCount = 4;
+-                LOGGER.warn("Invalid regionized chunk ticking thread count: {}, resetting to default (4)", regionizedChunkTickingExecutorThreadCount);
+-                regionizedChunkTickingExecutorThreadCount = 4;
++            if (regionizedChunkTickingExecutorThreadCount < 1 || regionizedChunkTickingExecutorThreadCount > 32) {
++                LOGGER.warn("Invalid regionized chunk ticking thread count: {}, resetting to default (6)", regionizedChunkTickingExecutorThreadCount);
++                regionizedChunkTickingExecutorThreadCount = 6;
              }
+         }
+ 

@@ -1,0 +1,13 @@
+--- a/net/minecraft/server/commands/ForceLoadCommand.java
++++ b/net/minecraft/server/commands/ForceLoadCommand.java
+@@ -158,8 +_,8 @@
+             int sectionPosCoord2 = SectionPos.blockToSectionCoord(max);
+             int sectionPosCoord3 = SectionPos.blockToSectionCoord(max1);
+             long l = (sectionPosCoord2 - sectionPosCoord + 1L) * (sectionPosCoord3 - sectionPosCoord1 + 1L);
+-            if (l > 256L) {
+-                throw ERROR_TOO_MANY_CHUNKS.create(256, l);
++            if (l > 2048L) {
++                throw ERROR_TOO_MANY_CHUNKS.create(2048, l);
+             } else {
+                 ServerLevel level = source.getLevel();
+                 ResourceKey<Level> resourceKey = level.dimension();

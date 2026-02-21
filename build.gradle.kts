@@ -10,6 +10,7 @@ val paperMavenPublicUrl = "https://repo.papermc.io/repository/maven-public/"
 
 paperweight {
     upstreams.register("divinemc") {
+        applyUpstreamNested = true
         repo = github("BX-Team", "DivineMC")
         ref = providers.gradleProperty("divineRef")
 
