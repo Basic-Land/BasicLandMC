@@ -1,6 +1,6 @@
 --- a/divinemc-server/build.gradle.kts
 +++ b/divinemc-server/build.gradle.kts
-@@ -43,6 +_,7 @@
+@@ -39,6 +_,7 @@
      // DivineMC start - Rebrand
      val divinemc = forks.register("divinemc") {
          forks = purpur
@@ -8,7 +8,7 @@
          upstream.patchRepo("paperServer") {
              upstreamRepo = purpur.patchedRepo("paperServer")
              patchesDir = rootDirectory.dir("divinemc-server/paper-patches")
-@@ -56,8 +_,35 @@
+@@ -52,8 +_,35 @@
          }
      }
  
@@ -46,7 +46,7 @@
  
      spigot {
          enabled = true
-@@ -150,6 +_,10 @@
+@@ -147,6 +_,10 @@
          java { srcDir("../purpur-server/src/main/java") }
          resources { srcDir("../purpur-server/src/main/resources") }
          // DivineMC end - Rebrand
@@ -57,7 +57,7 @@
      }
      test {
          java { srcDir("../paper-server/src/test/java") }
-@@ -158,6 +_,10 @@
+@@ -155,6 +_,10 @@
          java { srcDir("../purpur-server/src/test/java") }
          resources { srcDir("../purpur-server/src/test/resources") }
          // DivineMC end - Rebrand
@@ -68,7 +68,7 @@
      }
  }
  val log4jPlugins = sourceSets.create("log4jPlugins") {
-@@ -185,7 +_,8 @@
+@@ -183,7 +_,8 @@
  }
  
  dependencies {
@@ -77,8 +77,8 @@
 +    api("dev.cubxity.plugins", "unifiedmetrics-api", "0.3.8") // BasicLandMC - metrics implementation
  
      // DivineMC start - Dependencies
-     implementation("org.yaml:snakeyaml:2.3")
-@@ -288,14 +_,14 @@
+     implementation ("me.carleslc.Simple-YAML:Simple-Yaml:1.8.4") {
+@@ -286,14 +_,14 @@
          val experimental = rootProject.providers.gradleProperty("experimental").get() // DivineMC - Experimental flag
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",
