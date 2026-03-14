@@ -16,24 +16,36 @@ import java.util.List;
 import java.util.Map;
 
 public class MobCaps implements Collector, CollectorCollection {
-    private final static String METRIC_NAME = "minecraft_world_mob_caps";
+    private final static String SPAWNABLE_CHUNKS = "minecraft_world_mob_caps_spawnable_chunks";
+    private final static String MOB_CAPS_CURRENT = "minecraft_world_mob_caps_current";
+    private final static String MOB_CAPS_LIMIT = "minecraft_world_mob_caps_limit";
+
+    private final static MobCategory[] CATEGORIES = {
+        MobCategory.MONSTER,
+        MobCategory.CREATURE,
+        MobCategory.AMBIENT,
+        MobCategory.AXOLOTLS,
+        MobCategory.UNDERGROUND_WATER_CREATURE,
+        MobCategory.WATER_CREATURE,
+        MobCategory.WATER_AMBIENT
+    };
 
     @NotNull
     @Override
     public List<Metric> collect() {
         List<Metric> samples = new ArrayList<>();
         for (ServerLevel world : DedicatedServer.getServer().getAllLevels()) {
-            WorldData parse = parse(world);
+            WorldData parsed = parse(world);
             String name = world.serverLevelData.getLevelName();
 
-            samples.add(new GaugeMetric(METRIC_NAME + "_spawnable_chunks", Map.of("world", name), parse.spawnableChunks()));
-            for (Data data : parse.data()) {
+            samples.add(new GaugeMetric(SPAWNABLE_CHUNKS, Map.of("world", name), parsed.spawnableChunks()));
+            for (Data data : parsed.data()) {
                 Map<String, String> mobLabels = Map.of(
-                        "mob_category", data.category().getName(),
-                        "world", name
+                    "mob_category", data.category().getName(),
+                    "world", name
                 );
-                samples.add(new GaugeMetric(METRIC_NAME + "_current", mobLabels, data.current()));
-                samples.add(new GaugeMetric(METRIC_NAME + "_limit", mobLabels, data.limit()));
+                samples.add(new GaugeMetric(MOB_CAPS_CURRENT, mobLabels, data.current()));
+                samples.add(new GaugeMetric(MOB_CAPS_LIMIT, mobLabels, data.limit()));
             }
         }
         return samples;
@@ -51,10 +63,13 @@ public class MobCaps implements Collector, CollectorCollection {
 
         List<Data> list = new ArrayList<>();
 
-        for (MobCategory category : MobCategory.values()) {
+        for (MobCategory category : CATEGORIES) {
             int current = state == null ? 0 : state.getMobCategoryCounts().getOrDefault(category, 0);
 
             int limit = NaturalSpawner.globalLimitForCategory(level, category, chunks);
+            if (limit == -1) {
+                limit = 0;
+            }
             list.add(new Data(category, current, limit));
         }
 

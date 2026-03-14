@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: dan28000 <84990628+dan28000@users.noreply.github.com>
-Date: Mon, 26 Jan 2026 17:45:36 +0100
-Subject: [PATCH] rct improvments
+Date: Sat, 14 Mar 2026 13:07:06 +0100
+Subject: [PATCH] RCT-update
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/async/rct/AvgTimeLogger.java b/src/main/java/org/bxteam/divinemc/async/rct/AvgTimeLogger.java
@@ -97,10 +97,10 @@ index ceddc92b4914efa42568f1538d4997523fe8a531..00000000000000000000000000000000
 -    }
 -}
 diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
-index fd2b76ee98cc1eccd4d0df90d66553b845ea04d0..7b7baf69a5b922b8c5221a6ff70159d8bd852073 100644
+index 8c3baad11b1f0b7bf0a709e4b9bc9c30f2190979..d2a7247e08ec902f2bf700e617bee28470c595c4 100644
 --- a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
 +++ b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
-@@ -3,15 +3,14 @@ package org.bxteam.divinemc.async.rct;
+@@ -3,23 +3,14 @@ package org.bxteam.divinemc.async.rct;
  import ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet;
  import ca.spottedleaf.moonrise.common.util.CoordinateUtils;
  import ca.spottedleaf.moonrise.common.util.TickThread;
@@ -115,13 +115,6 @@ index fd2b76ee98cc1eccd4d0df90d66553b845ea04d0..7b7baf69a5b922b8c5221a6ff70159d8
  import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
  import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 -import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
- import net.minecraft.server.level.ServerChunkCache;
- import net.minecraft.server.level.ServerLevel;
- import net.minecraft.server.level.ServerPlayer;
-@@ -30,23 +29,22 @@ import org.bxteam.divinemc.util.NamedAgnosticThreadFactory;
- import org.jetbrains.annotations.NotNull;
- import org.slf4j.Logger;
- 
 -import java.util.ArrayList;
 -import java.util.List;
 -import java.util.Set;
@@ -129,31 +122,53 @@ index fd2b76ee98cc1eccd4d0df90d66553b845ea04d0..7b7baf69a5b922b8c5221a6ff70159d8
 -import java.util.concurrent.CompletionException;
 -import java.util.concurrent.Executor;
 -import java.util.concurrent.Executors;
+-import java.util.function.Supplier;
+ import net.minecraft.server.level.ServerChunkCache;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.server.level.ServerPlayer;
+@@ -37,14 +28,34 @@ import org.bxteam.divinemc.util.NamedAgnosticThreadFactory;
+ import org.jetbrains.annotations.NotNull;
+ import org.slf4j.Logger;
+ 
 +import java.io.IOException;
 +import java.util.*;
 +import java.util.concurrent.*;
- import java.util.function.Supplier;
- 
++import java.util.function.Supplier;
++
  public final class RegionizedChunkTicking extends ServerChunkCache {
 -    private static final Logger LOGGER = LogUtils.getLogger();
      public static final Executor REGION_EXECUTOR = Executors.newFixedThreadPool(DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadCount,
 -        new NamedAgnosticThreadFactory<>("Region Ticking", TickThread::new, DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadPriority)
 -    );
+-
+-    public RegionizedChunkTicking(final ServerLevel level, final LevelStorageSource.LevelStorageAccess levelStorageAccess, final DataFixer fixerUpper, final StructureTemplateManager structureManager, final Executor dispatcher, final ChunkGenerator generator, final int viewDistance, final int simulationDistance, final boolean sync, final ChunkStatusUpdateListener chunkStatusListener, final Supplier<DimensionDataStorage> overworldDataStorage) {
 +        new NamedAgnosticThreadFactory<>("Region Ticking", TickThread::new, DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadPriority));
 +    private static final Logger LOGGER = LogUtils.getLogger();
 +    private static final int LOG_INTERVAL = 18000;
 +    private final AvgTimeLogger avgTimeLogger;
 +    private int i = 0;
- 
-     public RegionizedChunkTicking(final ServerLevel level, final LevelStorageSource.LevelStorageAccess levelStorageAccess, final DataFixer fixerUpper, final StructureTemplateManager structureManager, final Executor dispatcher, final ChunkGenerator generator, final int viewDistance, final int simulationDistance, final boolean sync, final ChunkProgressListener progressListener, final ChunkStatusUpdateListener chunkStatusListener, final Supplier<DimensionDataStorage> overworldDataStorage) {
-         super(level, levelStorageAccess, fixerUpper, structureManager, dispatcher, generator, viewDistance, simulationDistance, sync, progressListener, chunkStatusListener, overworldDataStorage);
++
++    public RegionizedChunkTicking(
++        ServerLevel level,
++        LevelStorageSource.LevelStorageAccess levelStorageAccess,
++        DataFixer fixerUpper,
++        StructureTemplateManager structureManager,
++        Executor dispatcher,
++        ChunkGenerator generator,
++        int viewDistance,
++        int simulationDistance,
++        boolean sync,
++        ChunkStatusUpdateListener chunkStatusListener,
++        Supplier<DimensionDataStorage> overworldDataStorage
++    ) {
+         super(level, levelStorageAccess, fixerUpper, structureManager, dispatcher, generator, viewDistance, simulationDistance, sync, chunkStatusListener, overworldDataStorage);
 +        this.avgTimeLogger = new AvgTimeLogger(level.serverLevelData.getLevelName());
      }
  
      @Override
-@@ -54,32 +52,28 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+@@ -52,32 +63,28 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
          final ServerLevel world = this.level;
-         final int randomTickSpeed = world.getGameRules().getInt(GameRules.RULE_RANDOMTICKING);
+         final int randomTickSpeed = world.getGameRules().get(GameRules.RANDOM_TICK_SPEED);
          final LevelChunk[] raw = world.moonrise$getEntityTickingChunks().toArray(new LevelChunk[0]);
 -
 -        final TickPair tickPair = computePlayerRegionsParallel();
@@ -193,7 +208,7 @@ index fd2b76ee98cc1eccd4d0df90d66553b845ea04d0..7b7baf69a5b922b8c5221a6ff70159d8
                  if (chunk != null) {
                      level.tickChunk(chunk, randomTickSpeed);
                      regionChunksIDs.add(key);
-@@ -90,6 +84,8 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+@@ -88,6 +95,8 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
                  tickEntity(entity);
              }
  
@@ -202,7 +217,7 @@ index fd2b76ee98cc1eccd4d0df90d66553b845ea04d0..7b7baf69a5b922b8c5221a6ff70159d8
              return regionChunksIDs;
          }, REGION_EXECUTOR);
      }
-@@ -101,15 +97,31 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+@@ -99,15 +108,31 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
              LOGGER.error("Error during region chunk ticking", ex.getCause());
          }
  
@@ -212,7 +227,7 @@ index fd2b76ee98cc1eccd4d0df90d66553b845ea04d0..7b7baf69a5b922b8c5221a6ff70159d8
 +                for (RegionData regionData : tickPair.regions()) {
 +                    sb.append("Region with ").append(regionData.chunks().size()).append(" chunks and ").append(regionData.entities().size()).append(" entities ticked for Players:\n");
 +                    for (ServerPlayer player : regionData.players()) {
-+                        long avgNanos = Math.round(player.avgTickTimeNanos.longStream().average().orElse(0));
++                        long avgNanos = Math.round(player.avgTickTimeNanos.average().orElse(0));
 +                        long ms = avgNanos / 1_000_000;
 +                        long us = (avgNanos % 1_000_000) / 1_000;
 +                        long ns = avgNanos % 1_000;
@@ -237,7 +252,7 @@ index fd2b76ee98cc1eccd4d0df90d66553b845ea04d0..7b7baf69a5b922b8c5221a6ff70159d8
                  }
              }
          }
-@@ -125,103 +137,128 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+@@ -123,105 +148,134 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
          }
      }
  
@@ -422,7 +437,7 @@ index fd2b76ee98cc1eccd4d0df90d66553b845ea04d0..7b7baf69a5b922b8c5221a6ff70159d8
              }
          }
  
-+        regions.sort(Comparator.comparingDouble(r -> ((RegionData) r).players().stream().map(p -> p.avgTickTimeNanos.longStream().average().orElse(-1)).max(Comparator.naturalOrder()).orElse(-1d)).reversed());
++        regions.sort(Comparator.comparingDouble(r -> ((RegionData) r).players().stream().map(p -> p.avgTickTimeNanos.average().orElse(-1)).max(Comparator.naturalOrder()).orElse(-1d)).reversed());
          return new TickPair(regions.toArray(new RegionData[0]), firstTick);
      }
  
@@ -434,9 +449,16 @@ index fd2b76ee98cc1eccd4d0df90d66553b845ea04d0..7b7baf69a5b922b8c5221a6ff70159d8
 -    }
 -
      private void tickEntity(Entity entity) {
-         if (!entity.isRemoved() && !level.tickRateManager().isEntityFrozen(entity)) {
-             if (entity.moonrise$isUpdatingSectionStatus()) {
-@@ -242,4 +279,28 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+-        if (!entity.isRemoved() && !entity.moonrise$isUpdatingSectionStatus() && !level.tickRateManager().isEntityFrozen(entity)) {
++        if (!entity.isRemoved() && !level.tickRateManager().isEntityFrozen(entity)) {
++            if (entity.moonrise$isUpdatingSectionStatus()) {
++                LOGGER.info("Skipping tick for entity {} as it is in the process of updating section status", entity);
++                return;
++            }
+             entity.checkDespawn();
+             // Paper - rewrite chunk system
+             Entity vehicle = entity.getVehicle();
+@@ -236,4 +290,28 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
              level.guardEntityTick(level::tickNonPassenger, entity);
          }
      }
@@ -465,6 +487,111 @@ index fd2b76ee98cc1eccd4d0df90d66553b845ea04d0..7b7baf69a5b922b8c5221a6ff70159d8
 +    record TickPair(RegionData[] regions, Set<Entity> entities) {
 +    }
  }
+diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java b/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..d47003554028a344fdeffe4584d78387dd9a8dcf
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java
+@@ -0,0 +1,99 @@
++package org.bxteam.divinemc.async.rct;
++
++import java.util.Arrays;
++import java.util.OptionalDouble;
++import java.util.stream.LongStream;
++
++public final class RollingLongBuffer {
++    private final long[] buffer;
++    private final int capacity;
++    private int head = 0;    // index of oldest element
++    private int count = 0;   // number of elements in buffer (<= capacity)
++    private long sum = 0L;
++
++    public RollingLongBuffer(int capacity) {
++        if (capacity <= 0) throw new IllegalArgumentException("capacity must be > 0");
++        this.capacity = capacity;
++        this.buffer = new long[capacity];
++    }
++
++    /**
++     * Adds a value to the buffer.
++     * If the buffer is full, overwrites the oldest element.
++     * Returns true (keeps same signature semantics as List.add).
++     */
++    public synchronized boolean add(long value) {
++        if (count < capacity) {
++            int idx = (head + count) % capacity;
++            buffer[idx] = value;
++            sum += value;
++            count++;
++        } else {
++            // overwrite oldest at head
++            long old = buffer[head];
++            sum -= old;
++            buffer[head] = value;
++            sum += value;
++            head = (head + 1) % capacity;
++        }
++        return true;
++    }
++
++    /**
++     * Current number of elements stored.
++     */
++    public synchronized int size() {
++        return count;
++    }
++
++    /**
++     * Returns a LongStream of elements in order from oldest to newest.
++     * Note: this creates an IntStream-range and maps via index; it's lightweight.
++     */
++    public LongStream longStream() {
++        // We avoid synchronizing the entire stream creation by copying the
++        // head/count/capacity locally under sync so the stream is stable.
++        final long[] snapshot;
++        final int snapCount;
++        final int snapHead;
++        synchronized (this) {
++            snapCount = count;
++            snapHead = head;
++            if (snapCount == 0) {
++                return LongStream.empty();
++            }
++            snapshot = new long[snapCount];
++            for (int i = 0; i < snapCount; i++) {
++                snapshot[i] = buffer[(snapHead + i) % capacity];
++            }
++        }
++        return Arrays.stream(snapshot, 0, snapshot.length);
++    }
++
++    /**
++     * Returns the arithmetic average as OptionalDouble; O(1).
++     */
++    public synchronized OptionalDouble average() {
++        return (count == 0) ? OptionalDouble.empty() : OptionalDouble.of((double) sum / (double) count);
++    }
++
++    /**
++     * Returns a snapshot array of current contents from oldest to newest.
++     */
++    public synchronized long[] toArray() {
++        long[] out = new long[count];
++        for (int i = 0; i < count; i++) {
++            out[i] = buffer[(head + i) % capacity];
++        }
++        return out;
++    }
++
++    /**
++     * Clears buffer.
++     */
++    public synchronized void clear() {
++        head = 0;
++        count = 0;
++        sum = 0L;
++    }
++}
 diff --git a/src/main/java/org/bxteam/divinemc/async/rct/TickPair.java b/src/main/java/org/bxteam/divinemc/async/rct/TickPair.java
 deleted file mode 100644
 index 73c8e38b680cab90332688128e5d57bf6889ae64..0000000000000000000000000000000000000000

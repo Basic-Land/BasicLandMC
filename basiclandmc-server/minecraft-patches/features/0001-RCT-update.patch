@@ -1,0 +1,69 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Sat, 14 Mar 2026 13:21:15 +0100
+Subject: [PATCH] RCT-update
+
+
+diff --git a/net/minecraft/server/level/ServerChunkCache.java b/net/minecraft/server/level/ServerChunkCache.java
+index f22d4eaa4501aed85c2f80345fa4c6f41d7548be..14672258df7841e0e4a98094887c48b219a5246c 100644
+--- a/net/minecraft/server/level/ServerChunkCache.java
++++ b/net/minecraft/server/level/ServerChunkCache.java
+@@ -56,7 +56,7 @@ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
+ 
+ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moonrise.patches.chunk_system.world.ChunkSystemServerChunkCache { // Paper - rewrite chunk system
+-    private static final Logger LOGGER = LogUtils.getLogger();
++    protected static final Logger LOGGER = LogUtils.getLogger(); // DivineMC - private -> protected
+     private final DistanceManager distanceManager;
+     protected final ServerLevel level; // DivineMC - Regionized Chunk Ticking - private -> protected
+     public final Thread mainThread;
+@@ -918,7 +918,15 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+             if (serverChunkCache.runDistanceManagerUpdates()) {
+                 return true;
+             } else {
+-                return super.pollTask() | ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)serverChunkCache.level).moonrise$getChunkTaskScheduler().executeMainThreadTask();
++                //DivineMC - "crash fix" start
++                boolean mainPolled = false;
++                try {
++                    mainPolled = super.pollTask();
++                } catch (java.util.NoSuchElementException ex) {
++                    // Queue was empty; ignore and continue to scheduler execution.
++                }
++                return mainPolled | ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)serverChunkCache.level).moonrise$getChunkTaskScheduler().executeMainThreadTask();
++                //DivineMC - end
+             }
+             // Paper end - rewrite chunk system
+         }
+diff --git a/net/minecraft/server/level/ServerPlayer.java b/net/minecraft/server/level/ServerPlayer.java
+index 32a2819db5a929f0a8cde7f77f371bcd7890fd9c..e9f9a60c11104fc5a659b31d8c103edad451175c 100644
+--- a/net/minecraft/server/level/ServerPlayer.java
++++ b/net/minecraft/server/level/ServerPlayer.java
+@@ -198,6 +198,7 @@ import net.minecraft.world.scores.ScoreHolder;
+ import net.minecraft.world.scores.Scoreboard;
+ import net.minecraft.world.scores.Team;
+ import net.minecraft.world.scores.criteria.ObjectiveCriteria;
++import org.bxteam.divinemc.async.rct.RollingLongBuffer;
+ import org.jspecify.annotations.Nullable;
+ import org.slf4j.Logger;
+ 
+@@ -437,6 +438,7 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+     private boolean compassBar = false; // Purpur - Add compass command
+     private boolean ramBar = false; // Purpur - Implement rambar commands
+     public boolean hasTickedAtLeastOnceInNewWorld = false; // DivineMC - Parallel world ticking
++    public final RollingLongBuffer avgTickTimeNanos = new RollingLongBuffer(100); // DivineMC - Region tick time tracking
+ 
+     // Paper start - rewrite chunk system
+     private ca.spottedleaf.moonrise.patches.chunk_system.player.RegionizedPlayerChunkLoader.PlayerChunkLoaderData chunkLoader;
+diff --git a/net/minecraft/world/level/entity/EntityTickList.java b/net/minecraft/world/level/entity/EntityTickList.java
+index 224de1710ea09050fc7df70c33a38d1d957e9ac1..9988cd29bab890ab52bc2abec8746de50be6c3d5 100644
+--- a/net/minecraft/world/level/entity/EntityTickList.java
++++ b/net/minecraft/world/level/entity/EntityTickList.java
+@@ -10,7 +10,7 @@ import net.minecraft.server.level.ServerLevel; // DivineMC - Parallel world tick
+ import org.jspecify.annotations.Nullable;
+ 
+ public class EntityTickList {
+-    public final ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet<net.minecraft.world.entity.Entity> entities = new ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet<>(); // Paper - rewrite chunk system
++    public final ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet<net.minecraft.world.entity.Entity> entities = new ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet<>(net.minecraft.world.entity.Entity.class); // Paper - rewrite chunk system
+ 
+     // DivineMC start - Parallel world ticking
+     @Nullable

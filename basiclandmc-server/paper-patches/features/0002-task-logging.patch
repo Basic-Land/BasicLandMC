@@ -1,26 +1,39 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: dan28000 <84990628+dan28000@users.noreply.github.com>
-Date: Wed, 11 Feb 2026 22:44:48 +0100
+Date: Sat, 14 Mar 2026 18:03:11 +0100
 Subject: [PATCH] task-logging
 
 
+diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+index ad7189c40d6c69c785872c6860bd51d56e97935b..453f1699bd1d5083c0664c85aea49a18cfe72bd3 100644
+--- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+@@ -608,7 +608,9 @@ public final class CraftServer implements Server {
+ 
+         for (Plugin plugin : plugins) {
+             if ((!plugin.isEnabled()) && (plugin.getDescription().getLoad() == type)) {
++                long time = System.currentTimeMillis(); // BasicLandMC - Add time measurement
+                 this.enablePlugin(plugin);
++                logger.info("Enabled Plugin '" + plugin.getDescription().getFullName() + "' in " + (System.currentTimeMillis() - time) + " ms"); // BasicLandMC - Add time measurement
+             }
+         }
+ 
 diff --git a/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java b/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
-index a839dbbb72f48b8f8736d9f4693c528686570732..a4a727d82a71a59ff447c0efc54e64d5637bb286 100644
+index a3e4065916f2aa2971f4e19f0702c7a052af2090..fc8b7e24c0af5c2821a20b1e624d7fc2f3f42701 100644
 --- a/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
 +++ b/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
-@@ -45,7 +45,10 @@ import org.bukkit.scheduler.BukkitWorker;
+@@ -45,6 +45,10 @@ import org.bukkit.scheduler.BukkitWorker;
   * </ul>
   */
  public class CraftScheduler implements BukkitScheduler {
--
 +    private static final it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap<Plugin> PLUGIN_TIME_PER_TICK = new it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap<>();
 +    static {
 +        PLUGIN_TIME_PER_TICK.defaultReturnValue(0);
 +    }
+ 
      /**
       * The start ID for the counter.
-      */
-@@ -452,6 +455,7 @@ public class CraftScheduler implements BukkitScheduler {
+@@ -452,6 +456,7 @@ public class CraftScheduler implements BukkitScheduler {
       */
      public void mainThreadHeartbeat() {
          this.currentTick++;
@@ -28,7 +41,7 @@ index a839dbbb72f48b8f8736d9f4693c528686570732..a4a727d82a71a59ff447c0efc54e64d5
          // Paper start
          if (!this.isAsyncScheduler) {
              this.asyncScheduler.mainThreadHeartbeat();
-@@ -469,6 +473,7 @@ public class CraftScheduler implements BukkitScheduler {
+@@ -469,6 +474,7 @@ public class CraftScheduler implements BukkitScheduler {
                  continue;
              }
              if (task.isSync()) {
@@ -36,7 +49,7 @@ index a839dbbb72f48b8f8736d9f4693c528686570732..a4a727d82a71a59ff447c0efc54e64d5
                  this.currentTask = task;
                  try {
                      task.run();
-@@ -487,6 +492,16 @@ public class CraftScheduler implements BukkitScheduler {
+@@ -487,6 +493,16 @@ public class CraftScheduler implements BukkitScheduler {
                      // Paper end
                  } finally {
                      this.currentTask = null;
@@ -53,7 +66,7 @@ index a839dbbb72f48b8f8736d9f4693c528686570732..a4a727d82a71a59ff447c0efc54e64d5
                  }
                  this.parsePending();
              } else {
-@@ -505,6 +520,16 @@ public class CraftScheduler implements BukkitScheduler {
+@@ -505,6 +521,16 @@ public class CraftScheduler implements BukkitScheduler {
          }
          this.pending.addAll(temp);
          temp.clear();

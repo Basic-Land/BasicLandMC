@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: dan28000 <84990628+dan28000@users.noreply.github.com>
-Date: Sun, 22 Jun 2025 19:44:05 +0200
-Subject: [PATCH] Rebrand
+Date: Sat, 14 Mar 2026 18:00:55 +0100
+Subject: [PATCH] rebrand
 
 
 diff --git a/src/main/java/com/destroystokyo/paper/console/PaperConsole.java b/src/main/java/com/destroystokyo/paper/console/PaperConsole.java
@@ -18,7 +18,7 @@ index f5bc0eff886e9e3386467f40d4f329455d0b76e6..463c08978ad0ef92bb99bd9077dfcf92
                  .completer(new ConsoleCommandCompleter(this.server))
                  .option(LineReader.Option.COMPLETE_IN_WORD, true);
 diff --git a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
-index b0b05383838f2ebb42791a1fca8d3ce0d361e477..1e089ba1a08f17533cdd677b5223ad2996fc35af 100644
+index 4d3518795a238d87ca4f3df0bee074ab5bcc2734..e8f0ef936ca658e6e2a76d52fb9f81efcd488544 100644
 --- a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
 +++ b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
 @@ -35,6 +35,7 @@ public record ServerBuildInfoImpl(
@@ -41,16 +41,3 @@ index b0b05383838f2ebb42791a1fca8d3ce0d361e477..1e089ba1a08f17533cdd677b5223ad29
              SharedConstants.getCurrentVersion().id(),
              SharedConstants.getCurrentVersion().name(),
              getManifestAttribute(manifest, ATTRIBUTE_BUILD_NUMBER)
-diff --git a/src/main/java/org/bukkit/craftbukkit/util/Versioning.java b/src/main/java/org/bukkit/craftbukkit/util/Versioning.java
-index 4aef151bd162c4c99a3eaec1854b54639980a630..29a8111b7f0021698a5f5376e35b2b7f98b91462 100644
---- a/src/main/java/org/bukkit/craftbukkit/util/Versioning.java
-+++ b/src/main/java/org/bukkit/craftbukkit/util/Versioning.java
-@@ -11,7 +11,7 @@ public final class Versioning {
-     public static String getBukkitVersion() {
-         String result = "Unknown-Version";
- 
--        InputStream stream = Bukkit.class.getClassLoader().getResourceAsStream("META-INF/maven/org.bxteam.divinemc/divinemc-api/pom.properties"); // DivineMC - Rebrand
-+        InputStream stream = Bukkit.class.getClassLoader().getResourceAsStream("META-INF/maven/cz.basicland.mc/basiclandmc-api/pom.properties"); // BasicLandMC - Rebrand
-         Properties properties = new Properties();
- 
-         if (stream != null) {
