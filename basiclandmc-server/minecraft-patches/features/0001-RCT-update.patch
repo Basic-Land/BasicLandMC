@@ -4,6 +4,25 @@ Date: Sat, 14 Mar 2026 13:21:15 +0100
 Subject: [PATCH] RCT-update
 
 
+diff --git a/net/minecraft/server/level/ChunkMap.java b/net/minecraft/server/level/ChunkMap.java
+index 860f63b48b15c41b1e87a8a2f0034d13cd58eb60..1b1900a621b8790676b5c3e88065e63bdcf9a45a 100644
+--- a/net/minecraft/server/level/ChunkMap.java
++++ b/net/minecraft/server/level/ChunkMap.java
+@@ -804,9 +804,11 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+     boolean anyPlayerCloseEnoughTo(BlockPos pos, int radius) {
+         Vec3 vec3 = new Vec3(pos);
+ 
+-        for (ServerPlayer serverPlayer : this.playerMap.getAllPlayers()) {
+-            if (this.playerIsCloseEnoughTo(serverPlayer, vec3, radius)) {
+-                return true;
++        synchronized (this.playerMap) {
++            for (ServerPlayer serverPlayer : this.playerMap.getAllPlayers()) {
++                if (this.playerIsCloseEnoughTo(serverPlayer, vec3, radius)) {
++                    return true;
++                }
+             }
+         }
+ 
 diff --git a/net/minecraft/server/level/ServerChunkCache.java b/net/minecraft/server/level/ServerChunkCache.java
 index f22d4eaa4501aed85c2f80345fa4c6f41d7548be..14672258df7841e0e4a98094887c48b219a5246c 100644
 --- a/net/minecraft/server/level/ServerChunkCache.java
@@ -55,7 +74,7 @@ index 32a2819db5a929f0a8cde7f77f371bcd7890fd9c..e9f9a60c11104fc5a659b31d8c103eda
      // Paper start - rewrite chunk system
      private ca.spottedleaf.moonrise.patches.chunk_system.player.RegionizedPlayerChunkLoader.PlayerChunkLoaderData chunkLoader;
 diff --git a/net/minecraft/world/level/entity/EntityTickList.java b/net/minecraft/world/level/entity/EntityTickList.java
-index 224de1710ea09050fc7df70c33a38d1d957e9ac1..9988cd29bab890ab52bc2abec8746de50be6c3d5 100644
+index 224de1710ea09050fc7df70c33a38d1d957e9ac1..aca8bc8c37e33e299dc9baa74f7ac5e360ac8db8 100644
 --- a/net/minecraft/world/level/entity/EntityTickList.java
 +++ b/net/minecraft/world/level/entity/EntityTickList.java
 @@ -10,7 +10,7 @@ import net.minecraft.server.level.ServerLevel; // DivineMC - Parallel world tick
@@ -63,7 +82,7 @@ index 224de1710ea09050fc7df70c33a38d1d957e9ac1..9988cd29bab890ab52bc2abec8746de5
  
  public class EntityTickList {
 -    public final ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet<net.minecraft.world.entity.Entity> entities = new ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet<>(); // Paper - rewrite chunk system
-+    public final ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet<net.minecraft.world.entity.Entity> entities = new ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet<>(net.minecraft.world.entity.Entity.class); // Paper - rewrite chunk system
++    public final ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet<Entity> entities = new ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet<>(Entity.class); // Paper - rewrite chunk system
  
      // DivineMC start - Parallel world ticking
      @Nullable
