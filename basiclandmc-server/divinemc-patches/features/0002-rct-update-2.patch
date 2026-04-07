@@ -1,9 +1,31 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: dan28000 <84990628+dan28000@users.noreply.github.com>
 Date: Mon, 6 Apr 2026 17:45:14 +0200
-Subject: [PATCH] tick-times-cmd
+Subject: [PATCH] rct-update-2
 
 
+diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
+index f1fce59d8e9b26b6dabe10bf23f8506743baf859..0487a82cd62ff92a4e388e01a99fe9cf08733091 100644
+--- a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
++++ b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
+@@ -115,7 +115,7 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+             LOGGER.error("Error during region chunk ticking", ex.getCause());
+         }
+ 
+-        if (false && i % 100 == 0 && tickPair.regions().length > 0) {
++        if (i % 100 == 0 && tickPair.regions().length > 0) {
+             REGION_EXECUTOR.execute(() -> {
+                 StringBuilder sb = new StringBuilder();
+                 for (RegionData regionData : tickPair.regions()) {
+@@ -238,7 +238,7 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+         }
+ 
+         i++;
+-        if (false && i % LOG_INTERVAL == 0) {
++        if (i % LOG_INTERVAL == 0) {
+             LOGGER.info("Computed {} regions for {} players", regions.size(), players.size());
+             LOGGER.info("region sizes for each region: {}", Arrays.toString(regions.stream().mapToInt(r -> r.chunks().size()).toArray()));
+         }
 diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java b/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java
 index d47003554028a344fdeffe4584d78387dd9a8dcf..6ec65a95aead2fc32fb612ead1425ba7b25f0182 100644
 --- a/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java

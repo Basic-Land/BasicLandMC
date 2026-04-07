@@ -74,10 +74,10 @@
  dependencies {
 -    implementation(project(":divinemc-api")) // DivineMC - Rebrand
 +    implementation(project(":basiclandmc-api")) // BasicLandMC - Rebrand
-+    api("dev.cubxity.plugins", "unifiedmetrics-api", "0.3.8") // BasicLandMC - metrics implementation
++    compileOnly("dev.cubxity.plugins", "unifiedmetrics-api", "0.3.8") // BasicLandMC - metrics implementation
  
      // DivineMC start - Dependencies
-     implementation ("me.carleslc.Simple-YAML:Simple-Yaml:1.8.4") {
+     implementation ("com.github.Carleslc.Simple-YAML:Simple-Yaml:1.8.4") {
 @@ -286,14 +_,14 @@
          val experimental = rootProject.providers.gradleProperty("experimental").get() // DivineMC - Experimental flag
          attributes(
