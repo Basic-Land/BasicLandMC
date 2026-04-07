@@ -1,0 +1,194 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Mon, 6 Apr 2026 17:45:14 +0200
+Subject: [PATCH] tick-times-cmd
+
+
+diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java b/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java
+index d47003554028a344fdeffe4584d78387dd9a8dcf..6ec65a95aead2fc32fb612ead1425ba7b25f0182 100644
+--- a/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java
++++ b/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java
+@@ -2,6 +2,7 @@ package org.bxteam.divinemc.async.rct;
+ 
+ import java.util.Arrays;
+ import java.util.OptionalDouble;
++import java.util.OptionalLong;
+ import java.util.stream.LongStream;
+ 
+ public final class RollingLongBuffer {
+@@ -70,6 +71,38 @@ public final class RollingLongBuffer {
+         return Arrays.stream(snapshot, 0, snapshot.length);
+     }
+ 
++    /**
++     * Returns the arithmetic average of the last {@code n} entries as OptionalDouble.
++     * If the buffer is empty, returns OptionalDouble.empty().
++     * If n > size(), averages over the available entries.
++     *
++     * Time: O(n) where n is the requested number of entries (bounded by buffer size).
++     *
++     * @throws IllegalArgumentException if n <= 0
++     */
++    public synchronized OptionalDouble averageLast(int n) {
++        if (n <= 0) throw new IllegalArgumentException("n must be > 0");
++        if (count == 0) return OptionalDouble.empty();
++
++        int use = Math.min(n, count);
++        // accumulate in double to reduce risk of overflow for large sums
++        double acc = 0.0;
++        int start = (head + count - use) % capacity;
++        for (int i = 0; i < use; i++) {
++            acc += buffer[(start + i) % capacity];
++        }
++        return OptionalDouble.of(acc / (double) use);
++    }
++
++    /**
++     * Returns the last (newest) entry as OptionalLong, or OptionalLong.empty() if buffer is empty.
++     */
++    public synchronized OptionalLong last() {
++        if (count == 0) return OptionalLong.empty();
++        int idx = (head + count - 1) % capacity;
++        return OptionalLong.of(buffer[idx]);
++    }
++
+     /**
+      * Returns the arithmetic average as OptionalDouble; O(1).
+      */
+diff --git a/src/main/java/org/bxteam/divinemc/command/DivineCommand.java b/src/main/java/org/bxteam/divinemc/command/DivineCommand.java
+index 86a95b17965ffe5fb0058f2d88091ebae9b35726..d57e59acd4d03bdebd68bdfbb9d6b93651c17037 100644
+--- a/src/main/java/org/bxteam/divinemc/command/DivineCommand.java
++++ b/src/main/java/org/bxteam/divinemc/command/DivineCommand.java
+@@ -29,12 +29,14 @@ public final class DivineCommand extends Command {
+     private static final DivineSubCommand MSPT_SUBCOMMAND = new MSPTCommand();
+     private static final DivineSubCommand RELOAD_SUBCOMMAND = new ReloadCommand();
+     private static final DivineSubCommand VERSION_SUBCOMMAND = new VersionCommand();
++    private static final DivineSubCommand TICK_TIMES_SUBCOMMAND = new TickTimes();
+     private static final Map<String, DivineSubCommand> SUBCOMMANDS = Util.make(() -> {
+         final Map<Set<String>, DivineSubCommand> commands = new HashMap<>();
+ 
+         commands.put(Set.of(MSPTCommand.LITERAL_ARGUMENT), MSPT_SUBCOMMAND);
+         commands.put(Set.of(ReloadCommand.LITERAL_ARGUMENT), RELOAD_SUBCOMMAND);
+         commands.put(Set.of(VersionCommand.LITERAL_ARGUMENT), VERSION_SUBCOMMAND);
++        commands.put(Set.of(TickTimes.LITERAL_ARGUMENT), TICK_TIMES_SUBCOMMAND);
+ 
+         return commands.entrySet().stream()
+                 .flatMap(entry -> entry.getKey().stream().map(s -> Map.entry(s, entry.getValue())))
+diff --git a/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java b/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..eb13ef3f6a11558c22513b1c26d13c9e677bf933
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
+@@ -0,0 +1,112 @@
++package org.bxteam.divinemc.command.subcommands;
++
++import net.kyori.adventure.text.Component;
++import net.kyori.adventure.text.event.ClickCallback;
++import net.kyori.adventure.text.event.ClickEvent;
++import net.kyori.adventure.text.event.HoverEvent;
++import net.kyori.adventure.text.format.NamedTextColor;
++import net.minecraft.server.MinecraftServer;
++import net.minecraft.server.level.ServerPlayer;
++import org.bukkit.command.CommandSender;
++import org.bukkit.craftbukkit.entity.CraftPlayer;
++import org.bukkit.permissions.PermissionDefault;
++import org.bxteam.divinemc.command.DivineCommand;
++import org.bxteam.divinemc.command.DivineSubCommandPermission;
++import org.jetbrains.annotations.NotNull;
++
++import java.text.DecimalFormat;
++import java.time.Duration;
++import java.util.List;
++import java.util.Map;
++import java.util.stream.Collectors;
++
++import static net.kyori.adventure.text.format.NamedTextColor.*;
++
++public final class TickTimes extends DivineSubCommandPermission {
++    public static final String LITERAL_ARGUMENT = "ticktimes";
++    public static final String PERM = DivineCommand.BASE_PERM + "." + LITERAL_ARGUMENT;
++    private static final DecimalFormat DF = new DecimalFormat("########0.0");
++    private static final Component SLASH = Component.text("/");
++    private static final ClickCallback.Options options = ClickCallback.Options.builder().uses(-1).lifetime(Duration.ofMinutes(1)).build();
++    public TickTimes() {
++        super(PERM, PermissionDefault.OP);
++    }
++
++    @Override
++    public boolean execute(@NotNull CommandSender sender, @NotNull String subCommand, String @NotNull [] args) {
++        List<ServerPlayer> onlinePlayers = MinecraftServer.getServer().getPlayerList().players;
++        
++        if (onlinePlayers.isEmpty()) {
++            sender.sendMessage(Component.text("No players online.", NamedTextColor.GRAY));
++            return true;
++        }
++
++        Map<String, List<ServerPlayer>> playersByWorld = onlinePlayers.stream()
++                .collect(Collectors.groupingBy(p -> p.level().getWorld().getName()));
++
++        List<Map.Entry<String, List<ServerPlayer>>> sortedWorlds = playersByWorld.entrySet().stream()
++                .sorted((e1, e2) -> Integer.compare(e2.getValue().size(), e1.getValue().size()))
++                .toList();
++
++        sender.sendMessage(Component.text("━━━━━━━━━━━━━ ", GOLD)
++                .append(Component.text("Player Tick Times ", YELLOW))
++                .append(Component.text("(last/1s/5s)", NamedTextColor.GRAY))
++                .append(Component.text(" ━━━━━━━━━━━━━", GOLD)));
++
++        for (int i = 0; i < sortedWorlds.size(); i++) {
++            Map.Entry<String, List<ServerPlayer>> entry = sortedWorlds.get(i);
++            String worldName = entry.getKey();
++            List<ServerPlayer> players = entry.getValue();
++
++            players.sort((p1, p2) -> Double.compare(
++                    p2.avgTickTimeNanos.average().orElse(0),
++                    p1.avgTickTimeNanos.average().orElse(0)
++            ));
++
++            sender.sendMessage(Component.text("➤ ", YELLOW)
++                    .append(Component.text(worldName, GOLD))
++                    .append(Component.text(" (" + players.size() + " players)", GRAY)));
++
++            for (ServerPlayer player : players) {
++                double last = player.avgTickTimeNanos.last().orElse(0) * 1.0E-6;
++                double avg1s = player.avgTickTimeNanos.averageLast(20).orElse(0.0) * 1.0E-6;
++                double avg5s = player.avgTickTimeNanos.average().orElse(0.0) * 1.0E-6;
++
++                Component stats = Component.text(" [", GRAY)
++                        .append(getColoredValue(last))
++                        .append(SLASH)
++                        .append(getColoredValue(avg1s))
++                        .append(SLASH)
++                        .append(getColoredValue(avg5s))
++                        .append(Component.text("]", GRAY));
++
++                Component playerLine = Component.text("  - ", GRAY)
++                        .append(Component.text(player.getScoreboardName(), AQUA))
++                        .append(stats)
++                        .clickEvent(ClickEvent.callback(audience -> {
++                            if (audience instanceof CraftPlayer sourcePlayer) {
++                                MinecraftServer.getServer().execute(() -> sourcePlayer.teleport(player.getBukkitEntity().getLocation()));
++                            }
++                        }, options))
++                        .hoverEvent(HoverEvent.showText(Component.text("Click to teleport", GREEN)));
++
++                sender.sendMessage(playerLine);
++            }
++
++            if (i < sortedWorlds.size() - 1) {
++                sender.sendMessage(Component.empty());
++            }
++        }
++
++        return true;
++    }
++
++    private static Component getColoredValue(double value) {
++        NamedTextColor color = value >= 50 ? RED
++                : value >= 40 ? YELLOW
++                : value >= 30 ? GOLD
++                : value >= 20 ? GREEN
++                : AQUA;
++        return Component.text(DF.format(value) + "ms", color);
++    }
++}
