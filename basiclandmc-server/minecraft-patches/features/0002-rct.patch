@@ -1,0 +1,18 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Sat, 11 Apr 2026 18:48:37 +0200
+Subject: [PATCH] rct
+
+
+diff --git a/net/minecraft/server/level/ServerPlayer.java b/net/minecraft/server/level/ServerPlayer.java
+index 5a9ce8cde62b738ebda64cdf63535299cee1f640..cea395b2ba555a8aeb62f5e1a4bac607a67e58cf 100644
+--- a/net/minecraft/server/level/ServerPlayer.java
++++ b/net/minecraft/server/level/ServerPlayer.java
+@@ -438,6 +438,7 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+     private boolean ramBar = false; // Purpur - Implement rambar commands
+     public boolean hasTickedAtLeastOnceInNewWorld = false; // DivineMC - Parallel world ticking
+     public final org.bxteam.divinemc.async.rct.RollingLongBuffer avgTickTimeNanos = new org.bxteam.divinemc.async.rct.RollingLongBuffer(100); // DivineMC - Region tick time tracking
++    public int lastRegionChunkSize, lastRegionEntityAmount = 0;
+ 
+     // Paper start - rewrite chunk system
+     private ca.spottedleaf.moonrise.patches.chunk_system.player.RegionizedPlayerChunkLoader.PlayerChunkLoaderData chunkLoader;

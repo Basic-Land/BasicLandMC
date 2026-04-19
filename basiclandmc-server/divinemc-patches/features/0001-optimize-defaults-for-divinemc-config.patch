@@ -5,7 +5,7 @@ Subject: [PATCH] optimize-defaults-for-divinemc-config
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index a95441732c887702eac011721f9f89334be87afc..38a3853eb6a906e9c2fae74d666afb90d90eb822 100644
+index a95441732c887702eac011721f9f89334be87afc..3528eebdad4549e5bd2cfacc08a5157dad97cbd6 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 @@ -190,8 +190,8 @@ public class DivineConfig {
@@ -30,7 +30,23 @@ index a95441732c887702eac011721f9f89334be87afc..38a3853eb6a906e9c2fae74d666afb90
          public static int regionizedChunkTickingExecutorThreadPriority = Thread.NORM_PRIORITY + 2;
  
          // Async pathfinding settings
-@@ -381,7 +381,7 @@ public class DivineConfig {
+@@ -260,10 +260,12 @@ public class DivineConfig {
+             regionizedChunkTickingExecutorThreadPriority = getInt(ConfigCategory.ASYNC.key("regionized-chunk-ticking.executor-thread-priority"), regionizedChunkTickingExecutorThreadPriority,
+                 "Configures the thread priority of the executor");
+ 
+-            if (regionizedChunkTickingExecutorThreadCount < 1 || regionizedChunkTickingExecutorThreadCount > 10) {
+-                LOGGER.warn("Invalid regionized chunk ticking thread count: {}, resetting to default (4)", regionizedChunkTickingExecutorThreadCount);
+-                regionizedChunkTickingExecutorThreadCount = 4;
++            // BasiclandMC - optimize config start
++            if (regionizedChunkTickingExecutorThreadCount < 1 || regionizedChunkTickingExecutorThreadCount > (Runtime.getRuntime().availableProcessors() / 2)) {
++                LOGGER.warn("Invalid regionized chunk ticking thread count: {}, resetting to default (6)", regionizedChunkTickingExecutorThreadCount);
++                regionizedChunkTickingExecutorThreadCount = 6;
+             }
++            // BasiclandMC - end
+         }
+ 
+         private static void asyncPathfinding() {
+@@ -381,7 +383,7 @@ public class DivineConfig {
          public static int hopperThrottleSkipTicks = 0;
  
          // DAB settings
@@ -39,7 +55,7 @@ index a95441732c887702eac011721f9f89334be87afc..38a3853eb6a906e9c2fae74d666afb90
          public static int dabStartDistance = 12;
          public static int dabStartDistanceSquared;
          public static int dabMaximumActivationFrequency = 20;
-@@ -395,14 +395,16 @@ public class DivineConfig {
+@@ -395,14 +397,16 @@ public class DivineConfig {
              "goat"
          ));
  
@@ -63,7 +79,7 @@ index a95441732c887702eac011721f9f89334be87afc..38a3853eb6a906e9c2fae74d666afb90
  
          public static void load() {
              chunkSettings();
-@@ -762,7 +764,7 @@ public class DivineConfig {
+@@ -762,7 +766,7 @@ public class DivineConfig {
          public static int playerProfileResultCachingTimeout = 1440;
  
          // No chat reports
@@ -72,7 +88,7 @@ index a95441732c887702eac011721f9f89334be87afc..38a3853eb6a906e9c2fae74d666afb90
          public static boolean noChatReportsAddQueryData = true;
          public static boolean noChatReportsConvertToGameMessage = true;
          public static boolean noChatReportsDebugLog = false;
-@@ -770,12 +772,12 @@ public class DivineConfig {
+@@ -770,12 +774,12 @@ public class DivineConfig {
          public static String noChatReportsDisconnectDemandOnClientMessage = "You do not have No Chat Reports, and this server is configured to require it on client!";
  
          // Protocols

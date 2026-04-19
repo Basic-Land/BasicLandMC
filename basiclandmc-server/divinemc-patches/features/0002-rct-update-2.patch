@@ -5,10 +5,63 @@ Subject: [PATCH] rct-update-2
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
-index f1fce59d8e9b26b6dabe10bf23f8506743baf859..0487a82cd62ff92a4e388e01a99fe9cf08733091 100644
+index f1fce59d8e9b26b6dabe10bf23f8506743baf859..db46800e9838624db66a369bfe06ab31f2cc1760 100644
 --- a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
 +++ b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
-@@ -115,7 +115,7 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+@@ -4,26 +4,12 @@ import ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet;
+ import ca.spottedleaf.moonrise.common.util.CoordinateUtils;
+ import ca.spottedleaf.moonrise.common.util.TickThread;
+ import com.mojang.datafixers.DataFixer;
+-import com.mojang.logging.LogUtils;
+ import io.papermc.paper.entity.activation.ActivationRange;
+ import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+ import it.unimi.dsi.fastutil.ints.IntArrayList;
+ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+-import java.io.IOException;
+-import java.util.ArrayList;
+-import java.util.Arrays;
+-import java.util.Comparator;
+-import java.util.List;
+-import java.util.Objects;
+-import java.util.Set;
+-import java.util.concurrent.CompletableFuture;
+-import java.util.concurrent.CompletionException;
+-import java.util.concurrent.ConcurrentHashMap;
+-import java.util.concurrent.Executor;
+-import java.util.concurrent.Executors;
+-import java.util.function.Supplier;
+ import net.minecraft.server.level.ServerChunkCache;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.server.level.ServerPlayer;
+@@ -39,7 +25,11 @@ import net.minecraft.world.level.storage.LevelStorageSource;
+ import org.bxteam.divinemc.config.DivineConfig;
+ import org.bxteam.divinemc.util.NamedAgnosticThreadFactory;
+ import org.jetbrains.annotations.NotNull;
+-import org.slf4j.Logger;
++
++import java.io.IOException;
++import java.util.*;
++import java.util.concurrent.*;
++import java.util.function.Supplier;
+ 
+ public final class RegionizedChunkTicking extends ServerChunkCache {
+     public static final Executor REGION_EXECUTOR = Executors.newFixedThreadPool(DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadCount,
+@@ -103,7 +93,11 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+             }
+ 
+             final long end = System.nanoTime();
+-            region.players().forEach(player -> player.avgTickTimeNanos.add(end - start));
++            region.players().forEach(player -> {
++                player.avgTickTimeNanos.add(end - start);
++                player.lastRegionChunkSize = regionChunksIDs.size();
++                player.lastRegionEntityAmount = region.entities().size();
++            });
+             return regionChunksIDs;
+         }, REGION_EXECUTOR);
+     }
+@@ -115,7 +109,7 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
              LOGGER.error("Error during region chunk ticking", ex.getCause());
          }
  
@@ -17,7 +70,7 @@ index f1fce59d8e9b26b6dabe10bf23f8506743baf859..0487a82cd62ff92a4e388e01a99fe9cf
              REGION_EXECUTOR.execute(() -> {
                  StringBuilder sb = new StringBuilder();
                  for (RegionData regionData : tickPair.regions()) {
-@@ -238,7 +238,7 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+@@ -238,7 +232,7 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
          }
  
          i++;
@@ -98,16 +151,15 @@ index 86a95b17965ffe5fb0058f2d88091ebae9b35726..d57e59acd4d03bdebd68bdfbb9d6b936
                  .flatMap(entry -> entry.getKey().stream().map(s -> Map.entry(s, entry.getValue())))
 diff --git a/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java b/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..eb13ef3f6a11558c22513b1c26d13c9e677bf933
+index 0000000000000000000000000000000000000000..a040ee038ed4c9375342af402efc93be48d33508
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,121 @@
 +package org.bxteam.divinemc.command.subcommands;
 +
 +import net.kyori.adventure.text.Component;
 +import net.kyori.adventure.text.event.ClickCallback;
 +import net.kyori.adventure.text.event.ClickEvent;
-+import net.kyori.adventure.text.event.HoverEvent;
 +import net.kyori.adventure.text.format.NamedTextColor;
 +import net.minecraft.server.MinecraftServer;
 +import net.minecraft.server.level.ServerPlayer;
@@ -124,14 +176,17 @@ index 0000000000000000000000000000000000000000..eb13ef3f6a11558c22513b1c26d13c9e
 +import java.util.Map;
 +import java.util.stream.Collectors;
 +
++import static net.kyori.adventure.text.Component.empty;
++import static net.kyori.adventure.text.Component.text;
 +import static net.kyori.adventure.text.format.NamedTextColor.*;
 +
 +public final class TickTimes extends DivineSubCommandPermission {
 +    public static final String LITERAL_ARGUMENT = "ticktimes";
 +    public static final String PERM = DivineCommand.BASE_PERM + "." + LITERAL_ARGUMENT;
 +    private static final DecimalFormat DF = new DecimalFormat("########0.0");
-+    private static final Component SLASH = Component.text("/");
++    private static final Component SLASH = text("/");
 +    private static final ClickCallback.Options options = ClickCallback.Options.builder().uses(-1).lifetime(Duration.ofMinutes(1)).build();
++
 +    public TickTimes() {
 +        super(PERM, PermissionDefault.OP);
 +    }
@@ -139,23 +194,23 @@ index 0000000000000000000000000000000000000000..eb13ef3f6a11558c22513b1c26d13c9e
 +    @Override
 +    public boolean execute(@NotNull CommandSender sender, @NotNull String subCommand, String @NotNull [] args) {
 +        List<ServerPlayer> onlinePlayers = MinecraftServer.getServer().getPlayerList().players;
-+        
++
 +        if (onlinePlayers.isEmpty()) {
-+            sender.sendMessage(Component.text("No players online.", NamedTextColor.GRAY));
++            sender.sendMessage(text("No players online.", NamedTextColor.GRAY));
 +            return true;
 +        }
 +
 +        Map<String, List<ServerPlayer>> playersByWorld = onlinePlayers.stream()
-+                .collect(Collectors.groupingBy(p -> p.level().getWorld().getName()));
++            .collect(Collectors.groupingBy(p -> p.level().getWorld().getName()));
 +
 +        List<Map.Entry<String, List<ServerPlayer>>> sortedWorlds = playersByWorld.entrySet().stream()
-+                .sorted((e1, e2) -> Integer.compare(e2.getValue().size(), e1.getValue().size()))
-+                .toList();
++            .sorted((e1, e2) -> Integer.compare(e2.getValue().size(), e1.getValue().size()))
++            .toList();
 +
-+        sender.sendMessage(Component.text("━━━━━━━━━━━━━ ", GOLD)
-+                .append(Component.text("Player Tick Times ", YELLOW))
-+                .append(Component.text("(last/1s/5s)", NamedTextColor.GRAY))
-+                .append(Component.text(" ━━━━━━━━━━━━━", GOLD)));
++        sender.sendMessage(text("━━━━━━━━━━━━━ ", GOLD)
++            .append(text("Player Tick Times ", YELLOW))
++            .append(text("(last/1s/5s)", NamedTextColor.GRAY))
++            .append(text(" ━━━━━━━━━━━━━", GOLD)));
 +
 +        for (int i = 0; i < sortedWorlds.size(); i++) {
 +            Map.Entry<String, List<ServerPlayer>> entry = sortedWorlds.get(i);
@@ -163,42 +218,49 @@ index 0000000000000000000000000000000000000000..eb13ef3f6a11558c22513b1c26d13c9e
 +            List<ServerPlayer> players = entry.getValue();
 +
 +            players.sort((p1, p2) -> Double.compare(
-+                    p2.avgTickTimeNanos.average().orElse(0),
-+                    p1.avgTickTimeNanos.average().orElse(0)
++                p2.avgTickTimeNanos.average().orElse(0),
++                p1.avgTickTimeNanos.average().orElse(0)
 +            ));
 +
-+            sender.sendMessage(Component.text("➤ ", YELLOW)
-+                    .append(Component.text(worldName, GOLD))
-+                    .append(Component.text(" (" + players.size() + " players)", GRAY)));
++            sender.sendMessage(text("➤ ", YELLOW)
++                .append(text(worldName, GOLD))
++                .append(text(" (" + players.size() + " players)", GRAY)));
 +
 +            for (ServerPlayer player : players) {
 +                double last = player.avgTickTimeNanos.last().orElse(0) * 1.0E-6;
 +                double avg1s = player.avgTickTimeNanos.averageLast(20).orElse(0.0) * 1.0E-6;
 +                double avg5s = player.avgTickTimeNanos.average().orElse(0.0) * 1.0E-6;
 +
-+                Component stats = Component.text(" [", GRAY)
-+                        .append(getColoredValue(last))
-+                        .append(SLASH)
-+                        .append(getColoredValue(avg1s))
-+                        .append(SLASH)
-+                        .append(getColoredValue(avg5s))
-+                        .append(Component.text("]", GRAY));
++                Component stats = text(" [", GRAY)
++                    .append(getColoredValue(last))
++                    .append(SLASH)
++                    .append(getColoredValue(avg1s))
++                    .append(SLASH)
++                    .append(getColoredValue(avg5s))
++                    .append(text("]", GRAY));
 +
-+                Component playerLine = Component.text("  - ", GRAY)
-+                        .append(Component.text(player.getScoreboardName(), AQUA))
-+                        .append(stats)
++                Component hover = text("Last region size: ", GRAY)
++                    .append(text(player.lastRegionChunkSize, GREEN))
++                    .appendNewline()
++                    .append(text("Last region entity amount: ", GRAY))
++                    .append(text(player.lastRegionEntityAmount, GREEN));
++
++                Component playerLine = text("  - ", GRAY)
++                    .append(text(player.getPlainTextName(), AQUA)
++                        .hoverEvent(text("Click to teleport", GREEN))
 +                        .clickEvent(ClickEvent.callback(audience -> {
 +                            if (audience instanceof CraftPlayer sourcePlayer) {
 +                                MinecraftServer.getServer().execute(() -> sourcePlayer.teleport(player.getBukkitEntity().getLocation()));
 +                            }
 +                        }, options))
-+                        .hoverEvent(HoverEvent.showText(Component.text("Click to teleport", GREEN)));
++                    )
++                    .append(stats.hoverEvent(hover));
 +
 +                sender.sendMessage(playerLine);
 +            }
 +
 +            if (i < sortedWorlds.size() - 1) {
-+                sender.sendMessage(Component.empty());
++                sender.sendMessage(empty());
 +            }
 +        }
 +
@@ -207,10 +269,10 @@ index 0000000000000000000000000000000000000000..eb13ef3f6a11558c22513b1c26d13c9e
 +
 +    private static Component getColoredValue(double value) {
 +        NamedTextColor color = value >= 50 ? RED
-+                : value >= 40 ? YELLOW
-+                : value >= 30 ? GOLD
++            : value >= 40 ? YELLOW
++              : value >= 30 ? GOLD
 +                : value >= 20 ? GREEN
-+                : AQUA;
-+        return Component.text(DF.format(value) + "ms", color);
++                  : AQUA;
++        return text(DF.format(value) + "ms", color);
 +    }
 +}

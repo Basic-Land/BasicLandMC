@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Sat, 18 Apr 2026 19:32:16 +0200
+Subject: [PATCH] fix shared folder
+
+
+diff --git a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
+index 3200aef1ba5d079fc3790841c826b4cf3951f2cf..3242ca6bf3090d1eec4c7ff6435cf68ebe0cc0e3 100644
+--- a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
++++ b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
+@@ -118,8 +118,16 @@ public class PluginInitializerManager {
+         io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.PluginFlagProviderSource.INSTANCE, files);
+ 
+         @SuppressWarnings("unchecked")
+-        java.util.List<Path> dirs = ((java.util.List<File>) optionSet.valuesOf("add-plugin-dir")).stream().map(File::toPath).toList();
+-        dirs.forEach(pluginDir -> io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.DirectoryProviderSource.INSTANCE_NO_CREATE, pluginDir));
++        java.util.List<Path> pluginList = ((java.util.List<File>) optionSet.valuesOf("add-plugin-dir")).stream()
++            .filter(java.util.Objects::nonNull)
++            .map(f -> f.listFiles(file -> file.getName().endsWith(".jar")))
++            .filter(java.util.Objects::nonNull)
++            .flatMap(java.util.Arrays::stream)
++            .filter(File::isFile)
++            .map(File::toPath)
++            .toList();
++
++        io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.PluginFlagProviderSource.INSTANCE, pluginList);
+ 
+         final Set<String> paperPluginNames = new TreeSet<>();
+         final Set<String> legacyPluginNames = new TreeSet<>();
+diff --git a/src/main/java/org/bukkit/craftbukkit/Main.java b/src/main/java/org/bukkit/craftbukkit/Main.java
+index 83905d0ccf0ed2d55076b5edbfd4e8c4bebac1f5..ab465d79a4aeddb0bbe45a8f0ef1f9174310ce14 100644
+--- a/src/main/java/org/bukkit/craftbukkit/Main.java
++++ b/src/main/java/org/bukkit/craftbukkit/Main.java
+@@ -136,7 +136,7 @@ public class Main {
+                 this.acceptsAll(asList("add-plugin-dir", "add-extra-plugin-dir"), "Specify paths to extra plugin directories to be loaded in addition to the plugins folder. This argument can be specified multiple times, once for each extra plugin dir path.")
+                         .withRequiredArg()
+                         .ofType(File.class)
+-                        .defaultsTo(new File[] {})
++                        .defaultsTo(new File("extra"))
+                         .describedAs("Plugin directory");
+ 
+                 // Purpur start - Purpur config files
