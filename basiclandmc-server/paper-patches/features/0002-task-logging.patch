@@ -5,7 +5,7 @@ Subject: [PATCH] task-logging
 
 
 diff --git a/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java b/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
-index a839dbbb72f48b8f8736d9f4693c528686570732..a4a727d82a71a59ff447c0efc54e64d5637bb286 100644
+index a839dbbb72f48b8f8736d9f4693c528686570732..8faf7861c77e996e96f569117d3149c61cf18fc0 100644
 --- a/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
 +++ b/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
 @@ -45,7 +45,10 @@ import org.bukkit.scheduler.BukkitWorker;
@@ -53,16 +53,20 @@ index a839dbbb72f48b8f8736d9f4693c528686570732..a4a727d82a71a59ff447c0efc54e64d5
                  }
                  this.parsePending();
              } else {
-@@ -505,6 +520,16 @@ public class CraftScheduler implements BukkitScheduler {
+@@ -505,6 +520,20 @@ public class CraftScheduler implements BukkitScheduler {
          }
          this.pending.addAll(temp);
          temp.clear();
 +        //BasiclandMC - Print plugins that take too long to process tasks in the last tick - start
 +        PLUGIN_TIME_PER_TICK.object2IntEntrySet().forEach(entry -> {
 +            if (entry.getIntValue() >= 10_000_000L) {
++                String msg = String.format("Plugin %s took %dms to process all sync tasks", entry.getKey().getName(), entry.getIntValue() / 1_000_000L);
++                if (entry.getKey().getName().equals("ProtocolLib")) {
++                    System.out.println(msg);
++                }
 +                entry.getKey().getLogger().log(
 +                    Level.WARNING,
-+                    String.format("Plugin %s took %dms to process all sync tasks", entry.getKey().getName(), entry.getIntValue() / 1_000_000L)
++                    msg
 +                );
 +            }
 +        });

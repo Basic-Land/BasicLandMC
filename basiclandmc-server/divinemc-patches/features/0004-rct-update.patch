@@ -1,0 +1,956 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Tue, 25 Nov 2025 20:37:51 +0100
+Subject: [PATCH] rct-update
+
+
+diff --git a/src/main/java/org/bxteam/divinemc/async/rct/AvgTimeLogger.java b/src/main/java/org/bxteam/divinemc/async/rct/AvgTimeLogger.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..1b3170ca13a7b6ad4fc9302e060cbfeef4ece8d8
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/async/rct/AvgTimeLogger.java
+@@ -0,0 +1,120 @@
++package org.bxteam.divinemc.async.rct;
++
++import com.mojang.logging.LogUtils;
++import org.slf4j.Logger;
++
++import java.io.*;
++import java.time.LocalDate;
++import java.time.LocalTime;
++import java.time.format.DateTimeFormatter;
++import java.util.zip.GZIPOutputStream;
++
++public final class AvgTimeLogger {
++    private static final Logger LOGGER = LogUtils.getLogger();
++    private static final String LOG_DIR = "tracking";
++    private static final int MAX_LOG_AGE_DAYS = 30;
++    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
++    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
++    private final String levelName;
++    private FileWriter regionTickLogWriter;
++    private LocalDate currentDate;
++
++    public AvgTimeLogger(String levelName) {
++        this.levelName = levelName;
++        try {
++            File logDir = new File(LOG_DIR + "/" + levelName);
++            if (!logDir.exists() && !logDir.mkdirs()) {
++                LOGGER.warn("Failed to create log directory {}", logDir.getAbsolutePath());
++            }
++            currentDate = LocalDate.now();
++            initializeLogWriter();
++            cleanupOldLogs();
++        } catch (IOException e) {
++            LOGGER.error("Failed to initialize region tick time log file", e);
++        }
++    }
++
++    private void cleanupOldLogs() {
++        File logDir = new File(LOG_DIR + "/" + levelName);
++        File[] files = logDir.listFiles();
++        if (files == null) return;
++
++        LocalDate cutoffDate = LocalDate.now().minusDays(MAX_LOG_AGE_DAYS);
++
++        for (File file : files) {
++            String name = file.getName();
++            if (name.startsWith("region-tick-") && name.endsWith(".log")) {
++                String dateStr = name.substring("region-tick-".length(), name.length() - ".log".length());
++                try {
++                    LocalDate fileDate = LocalDate.parse(dateStr, DATE_FORMATTER);
++                    if (!fileDate.equals(LocalDate.now())) {
++                        compressLogFile(file);
++                    }
++                } catch (Exception ignored) {}
++            } else if (name.startsWith("region-tick-") && name.endsWith(".log.gz")) {
++                String dateStr = name.substring("region-tick-".length(), name.length() - ".log.gz".length());
++                try {
++                    LocalDate fileDate = LocalDate.parse(dateStr, DATE_FORMATTER);
++                    if (fileDate.isBefore(cutoffDate)) {
++                        if (!file.delete()) {
++                            LOGGER.warn("Failed to delete old log file: {}", file.getName());
++                        }
++                    }
++                } catch (Exception ignored) {}
++            }
++        }
++    }
++
++    private void compressLogFile(File file) {
++        File gzFile = new File(file.getAbsolutePath() + ".gz");
++        try (FileInputStream fis = new FileInputStream(file);
++             FileOutputStream fos = new FileOutputStream(gzFile);
++             GZIPOutputStream gzipOS = new GZIPOutputStream(fos)) {
++            byte[] buffer = new byte[1024];
++            int len;
++            while ((len = fis.read(buffer)) != -1) {
++                gzipOS.write(buffer, 0, len);
++            }
++        } catch (IOException e) {
++            LOGGER.error("Failed to compress old log: {}", file.getName(), e);
++            return;
++        }
++        if (!file.delete()) {
++            LOGGER.warn("Failed to delete original log file after compression: {}", file.getName());
++        }
++    }
++
++    private void initializeLogWriter() throws IOException {
++        String filename = "region-tick-" + currentDate.format(DATE_FORMATTER) + ".log";
++        File logFile = new File(LOG_DIR + "/" + levelName, filename);
++        regionTickLogWriter = new FileWriter(logFile, true);
++    }
++
++    public void logTickTime(String data) {
++        try {
++            LocalDate today = LocalDate.now();
++            if (!today.equals(currentDate)) {
++                currentDate = today;
++                if (regionTickLogWriter != null) {
++                    regionTickLogWriter.close();
++                }
++                cleanupOldLogs();
++                initializeLogWriter();
++            }
++
++            if (regionTickLogWriter != null) {
++                String timestamp = LocalTime.now().format(TIME_FORMATTER);
++                regionTickLogWriter.write("[" + timestamp + "]\n" + data);
++                regionTickLogWriter.flush();
++            }
++        } catch (Exception e) {
++            LOGGER.error("Failed to log region tick time", e);
++        }
++    }
++
++    public void close() throws IOException {
++        if (regionTickLogWriter != null) {
++            regionTickLogWriter.close();
++        }
++    }
++}
+diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RegionData.java b/src/main/java/org/bxteam/divinemc/async/rct/RegionData.java
+deleted file mode 100644
+index ceddc92b4914efa42568f1538d4997523fe8a531..0000000000000000000000000000000000000000
+--- a/src/main/java/org/bxteam/divinemc/async/rct/RegionData.java
++++ /dev/null
+@@ -1,12 +0,0 @@
+-package org.bxteam.divinemc.async.rct;
+-
+-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+-import net.minecraft.world.entity.Entity;
+-
+-import java.util.Set;
+-
+-record RegionData(LongOpenHashSet chunks, Set<Entity> entities) {
+-    public boolean isEmpty() {
+-        return chunks.isEmpty();
+-    }
+-}
+diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
+index d308a0447bba1ccd7834823b8d70f3f5980490c5..321a1a178283dfcf52a73170bc015573e7ce1c0c 100644
+--- a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
++++ b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
+@@ -3,15 +3,13 @@ package org.bxteam.divinemc.async.rct;
+ import ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet;
+ import ca.spottedleaf.moonrise.common.util.CoordinateUtils;
+ import ca.spottedleaf.moonrise.common.util.TickThread;
+-import ca.spottedleaf.moonrise.patches.chunk_system.player.RegionizedPlayerChunkLoader.ViewDistances;
+ import com.mojang.datafixers.DataFixer;
+-import com.mojang.logging.LogUtils;
+ import io.papermc.paper.entity.activation.ActivationRange;
++import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
++import it.unimi.dsi.fastutil.ints.IntArrayList;
+ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+-import it.unimi.dsi.fastutil.longs.LongIterator;
+ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+ import net.minecraft.server.level.ServerChunkCache;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.server.level.ServerPlayer;
+@@ -27,70 +25,68 @@ import net.minecraft.world.level.storage.DimensionDataStorage;
+ import net.minecraft.world.level.storage.LevelStorageSource;
+ import org.bxteam.divinemc.config.DivineConfig;
+ import org.bxteam.divinemc.util.NamedAgnosticThreadFactory;
+-import org.slf4j.Logger;
+-
+-import java.util.ArrayList;
+-import java.util.List;
+-import java.util.Set;
+-import java.util.concurrent.CompletableFuture;
+-import java.util.concurrent.CompletionException;
+-import java.util.concurrent.Executor;
+-import java.util.concurrent.Executors;
++import org.jetbrains.annotations.NotNull;
++
++import java.io.IOException;
++import java.util.*;
++import java.util.concurrent.*;
+ import java.util.function.Supplier;
+ 
+ public final class RegionizedChunkTicking extends ServerChunkCache {
+-    private static final Logger LOGGER = LogUtils.getLogger();
+     public static final Executor REGION_EXECUTOR = Executors.newFixedThreadPool(DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadCount,
+-        new NamedAgnosticThreadFactory<>("Region Ticking", TickThread::new, DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadPriority)
+-    );
++        new NamedAgnosticThreadFactory<>("Region Ticking", TickThread::new, DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadPriority));
++    private static final int LOG_INTERVAL = 18000;
++    private final AvgTimeLogger avgTimeLogger;
++    private int i = 0;
+ 
+     public RegionizedChunkTicking(final ServerLevel level, final LevelStorageSource.LevelStorageAccess levelStorageAccess, final DataFixer fixerUpper, final StructureTemplateManager structureManager, final Executor dispatcher, final ChunkGenerator generator, final int viewDistance, final int simulationDistance, final boolean sync, final ChunkProgressListener progressListener, final ChunkStatusUpdateListener chunkStatusListener, final Supplier<DimensionDataStorage> overworldDataStorage) {
+         super(level, levelStorageAccess, fixerUpper, structureManager, dispatcher, generator, viewDistance, simulationDistance, sync, progressListener, chunkStatusListener, overworldDataStorage);
++        this.avgTimeLogger = new AvgTimeLogger(level.serverLevelData.getLevelName());
+     }
+ 
+-    public void execute(CompletableFuture<Void> spawns, final LevelChunk[] raw) {
+-        final TickPair tickPair = computePlayerRegionsParallel();
++    @Override
++    protected void iterateTickingChunksFaster(final @NotNull CompletableFuture<Void> spawns) {
++        final ServerLevel world = this.level;
++        final int randomTickSpeed = world.getGameRules().getInt(GameRules.RULE_RANDOMTICKING);
++        final LevelChunk[] raw = world.moonrise$getEntityTickingChunks().toArray(new LevelChunk[0]);
++        final TickPair tickPair = computePlayerRegions();
+         final RegionData[] regions = tickPair.regions();
+-        final int regionCount = regions.length;
+ 
+         ActivationRange.activateEntities(level); // Paper - EAR
+-
+-        final int randomTickSpeed = level.getGameRules().getInt(GameRules.RULE_RANDOMTICKING);
+-        ObjectArrayList<CompletableFuture<LongOpenHashSet>> ticked = new ObjectArrayList<>(regionCount);
+-
++        ObjectArrayList<CompletableFuture<LongOpenHashSet>> futures = new ObjectArrayList<>(regions.length);
+         for (final RegionData region : regions) {
+             if (region == null || region.isEmpty()) {
+                 continue;
+             }
+-
+-            ticked.add(tick(region, randomTickSpeed));
++            futures.add(tick(region, randomTickSpeed));
+         }
+ 
+-        CompletableFuture.runAsync(() -> {
+-            finishTicking(ticked, randomTickSpeed, raw, tickPair);
+-            spawns.join();
+-        }, REGION_EXECUTOR).join();
++        finishTicking(futures, randomTickSpeed, raw, tickPair);
++        spawns.join();
+     }
+ 
+     private CompletableFuture<LongOpenHashSet> tick(RegionData region, int randomTickSpeed) {
+         return CompletableFuture.supplyAsync(() -> {
+-            ObjectArrayList<LevelChunk> regionChunks = new ObjectArrayList<>(region.chunks().size());
+-            LongOpenHashSet regionChunksIDs = new LongOpenHashSet(region.chunks().size());
+-            for (long key : region.chunks()) {
+-                LevelChunk chunk = fullChunks.get(key);
++            final long start = System.nanoTime();
++            final LongOpenHashSet regionChunksIDs = new LongOpenHashSet(region.chunks().size());
++            for (final long key : region.chunks()) {
++                final LevelChunk chunk = fullChunks.get(key);
+                 if (chunk != null) {
+-                    regionChunks.add(chunk);
++                    level.tickChunk(chunk, randomTickSpeed);
+                     regionChunksIDs.add(key);
+                 }
+             }
+ 
+-            for (LevelChunk chunk : regionChunks) {
+-                level.tickChunk(chunk, randomTickSpeed);
+-            }
+             for (Entity entity : region.entities()) {
+                 tickEntity(entity);
+             }
+ 
++            final long end = System.nanoTime();
++            for (ServerPlayer player : region.players()) {
++                player.avgTickTimeNanos.add(end - start);
++                player.lastRegionChunkSize = regionChunksIDs.size();
++                player.lastRegionEntityAmount = region.entities().size();
++            }
+             return regionChunksIDs;
+         }, REGION_EXECUTOR);
+     }
+@@ -102,15 +98,31 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+             LOGGER.error("Error during region chunk ticking", ex.getCause());
+         }
+ 
++        if (i % 100 == 0 && tickPair.regions().length > 0) {
++            REGION_EXECUTOR.execute(() -> {
++                StringBuilder sb = new StringBuilder();
++                for (RegionData regionData : tickPair.regions()) {
++                    sb.append("Region with ").append(regionData.chunks().size()).append(" chunks and ").append(regionData.entities().size()).append(" entities ticked for Players:\n");
++                    for (ServerPlayer player : regionData.players()) {
++                        long avgNanos = Math.round(player.avgTickTimeNanos.average().orElse(0));
++                        long ms = avgNanos / 1_000_000;
++                        long us = (avgNanos % 1_000_000) / 1_000;
++                        long ns = avgNanos % 1_000;
++                        sb.append("- ").append(player.displayName).append(" avg region tick time: ").append(ms).append(" ms ").append(us).append(" us ").append(ns).append(" ns").append("\n");
++                    }
++                }
++                avgTimeLogger.logTickTime(sb.toString());
++            });
++        }
++
+         LongOpenHashSet tickedChunkKeys = new LongOpenHashSet(raw.length);
+ 
+         for (CompletableFuture<LongOpenHashSet> future : ticked) {
+             if (!future.isCompletedExceptionally()) {
+                 try {
+-                    LongOpenHashSet regionChunks = future.join();
+-                    tickedChunkKeys.addAll(regionChunks);
++                    tickedChunkKeys.addAll(future.join());
+                 } catch (Exception e) {
+-                    LOGGER.error("Exception in region ticking future", e);
++                    LOGGER.error("Exception retrieving region ticking result", e);
+                 }
+             }
+         }
+@@ -126,119 +138,175 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+         }
+     }
+ 
+-    private TickPair computePlayerRegionsParallel() {
+-        int tickViewDistance = level.moonrise$getViewDistanceHolder().getViewDistances().tickViewDistance();
++    private TickPair computePlayerRegions() {
+         List<ServerPlayer> players = new ArrayList<>(level.players());
+-        int max = maxChunksForViewDistance();
+-
+-        List<LongOpenHashSet> playerChunkSets = players.parallelStream()
+-            .map(player -> {
+-                ChunkPos playerChunk = player.chunkPosition();
+-                int px = playerChunk.x;
+-                int pz = playerChunk.z;
+-                LongOpenHashSet chunkKeys = new LongOpenHashSet(max);
+-                for (int dx = -tickViewDistance; dx <= tickViewDistance; dx++) {
+-                    for (int dz = -tickViewDistance; dz <= tickViewDistance; dz++) {
+-                        long key = CoordinateUtils.getChunkKey(px + dx, pz + dz);
+-                        chunkKeys.add(key);
+-                    }
++        final int defaultTickDist = level.moonrise$getViewDistanceHolder().getViewDistances().tickViewDistance();
++        final int defaultAmountOfChunks = (2 * defaultTickDist + 1) * (2 * defaultTickDist + 1);
++        final int playerCount = players.size();
++
++        Rectangle[] boundaries = new Rectangle[playerCount];
++        int[] playerTickDistances = new int[playerCount];
++
++        for (int i = 0; i < playerCount; i++) {
++            ServerPlayer player = players.get(i);
++            ChunkPos pos = player.chunkPosition();
++            int tickDist = player.moonrise$getViewDistanceHolder().getViewDistances().tickViewDistance();
++            if (tickDist == -1) tickDist = defaultTickDist;
++
++            playerTickDistances[i] = tickDist;
++
++            boundaries[i] = new Rectangle(
++                pos.x - tickDist, pos.z - tickDist,
++                pos.x + tickDist, pos.z + tickDist
++            );
++        }
++
++        UnionFind uf = new UnionFind(playerCount);
++        for (int i = 0; i < playerCount; i++) {
++            for (int j = i + 1; j < playerCount; j++) {
++                if (boundaries[i].intersects(boundaries[j])) {
++                    uf.union(i, j);
+                 }
+-                return chunkKeys;
+-            }).toList();
++            }
++        }
+ 
+-        List<LongOpenHashSet> mergedRegions = new ArrayList<>();
+-        boolean[] merged = new boolean[playerChunkSets.size()];
++        Int2IntOpenHashMap rootToGroup = new Int2IntOpenHashMap(playerCount);
++        rootToGroup.defaultReturnValue(-1);
++        ObjectArrayList<IntArrayList> groups = new ObjectArrayList<>();
++
++        for (int i = 0; i < playerCount; i++) {
++            int root = uf.find(i);
++            int groupIdx = rootToGroup.get(root);
++            if (groupIdx == -1) {
++                groupIdx = groups.size();
++                rootToGroup.put(root, groupIdx);
++                groups.add(new IntArrayList(1));
++            }
++            groups.get(groupIdx).add(i);
++        }
+ 
+-        for (int i = 0; i < playerChunkSets.size(); i++) {
+-            if (merged[i]) continue;
++        ObjectArrayList<RegionData> regions = new ObjectArrayList<>(groups.size());
+ 
+-            LongOpenHashSet region = new LongOpenHashSet(playerChunkSets.get(i));
+-            merged[i] = true;
++        int totalEstimatedChunks = 0;
+ 
+-            boolean madeChanges;
+-            do {
+-                madeChanges = false;
+-                for (int j = i + 1; j < playerChunkSets.size(); j++) {
+-                    if (merged[j]) continue;
++        for (IntArrayList group : groups) {
++            if (group.isEmpty()) continue;
+ 
+-                    LongOpenHashSet set = playerChunkSets.get(j);
++            LongOpenHashSet groupChunks = new LongOpenHashSet(defaultAmountOfChunks);
+ 
+-                    boolean hasIntersection = false;
+-                    LongIterator iter = set.iterator();
+-                    while (iter.hasNext()) {
+-                        if (region.contains(iter.nextLong())) {
+-                            hasIntersection = true;
+-                            break;
+-                        }
+-                    }
++            for (int i = 0; i < group.size(); i++) {
++                int playerIdx = group.getInt(i);
++                ServerPlayer player = players.get(playerIdx);
++                ChunkPos center = player.chunkPosition();
++                int dist = playerTickDistances[playerIdx];
+ 
+-                    if (hasIntersection) {
+-                        region.addAll(set);
+-                        merged[j] = true;
+-                        madeChanges = true;
++                for (int dx = -dist; dx <= dist; dx++) {
++                    for (int dz = -dist; dz <= dist; dz++) {
++                        groupChunks.add(CoordinateUtils.getChunkKey(center.x + dx, center.z + dz));
+                     }
+                 }
+-            } while (madeChanges);
++            }
+ 
+-            mergedRegions.add(region);
++            regions.add(new RegionData(groupChunks, ConcurrentHashMap.newKeySet(100), ConcurrentHashMap.newKeySet(4)));
++            totalEstimatedChunks += groupChunks.size();
+         }
+ 
+-        ObjectArrayList<RegionData> regions = new ObjectArrayList<>();
+-        Long2IntOpenHashMap chunkToRegion = new Long2IntOpenHashMap(max * mergedRegions.size());
++        Long2IntOpenHashMap chunkToRegion = new Long2IntOpenHashMap(totalEstimatedChunks);
+         chunkToRegion.defaultReturnValue(-1);
+-        for (int i = 0; i < mergedRegions.size(); i++) {
+-            regions.add(new RegionData(mergedRegions.get(i), new ObjectOpenHashSet<>()));
+-            for (long key : mergedRegions.get(i)) {
+-                chunkToRegion.put(key, i);
++
++        for (int idx = 0; idx < regions.size(); idx++) {
++            for (long key : regions.get(idx).chunks()) {
++                chunkToRegion.put(key, idx);
+             }
+         }
+ 
+-        final Set<Entity> firstTick = new ObjectOpenHashSet<>();
++        i++;
++        if (i % LOG_INTERVAL == 0) {
++            LOGGER.info(
++                "Computed {} regions for {} players\n" +
++                "region sizes for each region: {}",
++                regions.size(),
++                players.size(),
++                Arrays.toString(regions.stream().mapToInt(r -> r.chunks().size()).toArray())
++            );
++        }
++
++        final Set<Entity> firstTick = ConcurrentHashMap.newKeySet();
++
++        IteratorSafeOrderedReferenceSet<Entity> entities;
++        synchronized (entities = getEntityTickList().entities) {
++            entities.createRawIterator();
+ 
+-        synchronized (getEntityTickList().entities) {
+-            final IteratorSafeOrderedReferenceSet.Iterator<Entity> iterator = getEntityTickList().entities.iterator();
+             try {
+-                while (iterator.hasNext()) {
+-                    Entity entity = iterator.next();
+-                    long chunkKey = entity.chunkPosition().longKey;
+-                    int regionIndex = chunkToRegion.get(chunkKey);
+-                    if (regionIndex != -1) {
+-                        regions.get(regionIndex).entities().add(entity);
+-                    } else {
+-                        firstTick.add(entity);
+-                    }
+-                }
++                final Entity[] rawList = entities.getListRaw();
++                final int limit = entities.getListSize();
++                Arrays.stream(rawList, 0, limit)
++                    .parallel()
++                    .filter(Objects::nonNull)
++                    .forEach(entity -> {
++                        long chunkKey = entity.chunkPosition().longKey;
++                        int regionIndex = chunkToRegion.get(chunkKey);
++                        if (regionIndex != -1) {
++                            RegionData targetRegion = regions.get(regionIndex);
++                            targetRegion.entities().add(entity);
++                            if (entity instanceof ServerPlayer player) {
++                                targetRegion.players().add(player);
++                            }
++                        } else {
++                            firstTick.add(entity);
++                        }
++                    });
+             } finally {
+-                iterator.finishedIterating();
++                entities.finishRawIterator();
+             }
+         }
+ 
++        regions.sort(Comparator.comparingDouble(r -> ((RegionData) r).players().stream().map(p -> p.avgTickTimeNanos.average().orElse(-1)).max(Comparator.naturalOrder()).orElse(-1d)).reversed());
+         return new TickPair(regions.toArray(new RegionData[0]), firstTick);
+     }
+ 
+-    // Should be max safe estimate of ticking chunks in a region
+-    private int maxChunksForViewDistance() {
+-        ViewDistances distances = level.moonrise$getViewDistanceHolder().getViewDistances();
+-        int diameter = 2 * distances.tickViewDistance() + 1;
+-        return diameter * diameter;
+-    }
+-
+     private void tickEntity(Entity entity) {
+-        if (!entity.isRemoved()) {
+-            if (!level.tickRateManager().isEntityFrozen(entity)) {
+-                entity.checkDespawn();
+-                // Paper - rewrite chunk system
+-                Entity vehicle = entity.getVehicle();
+-                if (vehicle != null) {
+-                    if (!vehicle.isRemoved() && vehicle.hasPassenger(entity)) {
+-                        return;
+-                    }
+-
+-                    entity.stopRiding();
++        if (!entity.isRemoved() && !level.tickRateManager().isEntityFrozen(entity)) {
++            if (entity.moonrise$isUpdatingSectionStatus()) {
++                LOGGER.info("Skipping tick for entity {} as it is in the process of updating section status", entity);
++                return;
++            }
++            entity.checkDespawn();
++            // Paper - rewrite chunk system
++            Entity vehicle = entity.getVehicle();
++            if (vehicle != null) {
++                if (!vehicle.isRemoved() && vehicle.hasPassenger(entity)) {
++                    return;
+                 }
+ 
+-                level.guardEntityTick(level::tickNonPassenger, entity);
++                entity.stopRiding();
+             }
++
++            level.guardEntityTick(level::tickNonPassenger, entity);
++        }
++    }
++
++    @Override
++    public void close() throws IOException {
++        avgTimeLogger.close();
++        super.close();
++    }
++
++    record RegionData(LongOpenHashSet chunks, Set<Entity> entities, Set<ServerPlayer> players) {
++        public boolean isEmpty() {
++            return chunks.isEmpty();
++        }
++    }
++
++    record Rectangle(int minX, int minZ, int maxX, int maxZ) {
++        boolean intersects(Rectangle other) {
++            return !(this.maxX < other.minX ||
++                this.minX > other.maxX ||
++                this.maxZ < other.minZ ||
++                this.minZ > other.maxZ);
+         }
+     }
++
++    record TickPair(RegionData[] regions, Set<Entity> entities) {
++    }
+ }
+diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java b/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..6ec65a95aead2fc32fb612ead1425ba7b25f0182
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java
+@@ -0,0 +1,132 @@
++package org.bxteam.divinemc.async.rct;
++
++import java.util.Arrays;
++import java.util.OptionalDouble;
++import java.util.OptionalLong;
++import java.util.stream.LongStream;
++
++public final class RollingLongBuffer {
++    private final long[] buffer;
++    private final int capacity;
++    private int head = 0;    // index of oldest element
++    private int count = 0;   // number of elements in buffer (<= capacity)
++    private long sum = 0L;
++
++    public RollingLongBuffer(int capacity) {
++        if (capacity <= 0) throw new IllegalArgumentException("capacity must be > 0");
++        this.capacity = capacity;
++        this.buffer = new long[capacity];
++    }
++
++    /**
++     * Adds a value to the buffer.
++     * If the buffer is full, overwrites the oldest element.
++     * Returns true (keeps same signature semantics as List.add).
++     */
++    public synchronized boolean add(long value) {
++        if (count < capacity) {
++            int idx = (head + count) % capacity;
++            buffer[idx] = value;
++            sum += value;
++            count++;
++        } else {
++            // overwrite oldest at head
++            long old = buffer[head];
++            sum -= old;
++            buffer[head] = value;
++            sum += value;
++            head = (head + 1) % capacity;
++        }
++        return true;
++    }
++
++    /**
++     * Current number of elements stored.
++     */
++    public synchronized int size() {
++        return count;
++    }
++
++    /**
++     * Returns a LongStream of elements in order from oldest to newest.
++     * Note: this creates an IntStream-range and maps via index; it's lightweight.
++     */
++    public LongStream longStream() {
++        // We avoid synchronizing the entire stream creation by copying the
++        // head/count/capacity locally under sync so the stream is stable.
++        final long[] snapshot;
++        final int snapCount;
++        final int snapHead;
++        synchronized (this) {
++            snapCount = count;
++            snapHead = head;
++            if (snapCount == 0) {
++                return LongStream.empty();
++            }
++            snapshot = new long[snapCount];
++            for (int i = 0; i < snapCount; i++) {
++                snapshot[i] = buffer[(snapHead + i) % capacity];
++            }
++        }
++        return Arrays.stream(snapshot, 0, snapshot.length);
++    }
++
++    /**
++     * Returns the arithmetic average of the last {@code n} entries as OptionalDouble.
++     * If the buffer is empty, returns OptionalDouble.empty().
++     * If n > size(), averages over the available entries.
++     *
++     * Time: O(n) where n is the requested number of entries (bounded by buffer size).
++     *
++     * @throws IllegalArgumentException if n <= 0
++     */
++    public synchronized OptionalDouble averageLast(int n) {
++        if (n <= 0) throw new IllegalArgumentException("n must be > 0");
++        if (count == 0) return OptionalDouble.empty();
++
++        int use = Math.min(n, count);
++        // accumulate in double to reduce risk of overflow for large sums
++        double acc = 0.0;
++        int start = (head + count - use) % capacity;
++        for (int i = 0; i < use; i++) {
++            acc += buffer[(start + i) % capacity];
++        }
++        return OptionalDouble.of(acc / (double) use);
++    }
++
++    /**
++     * Returns the last (newest) entry as OptionalLong, or OptionalLong.empty() if buffer is empty.
++     */
++    public synchronized OptionalLong last() {
++        if (count == 0) return OptionalLong.empty();
++        int idx = (head + count - 1) % capacity;
++        return OptionalLong.of(buffer[idx]);
++    }
++
++    /**
++     * Returns the arithmetic average as OptionalDouble; O(1).
++     */
++    public synchronized OptionalDouble average() {
++        return (count == 0) ? OptionalDouble.empty() : OptionalDouble.of((double) sum / (double) count);
++    }
++
++    /**
++     * Returns a snapshot array of current contents from oldest to newest.
++     */
++    public synchronized long[] toArray() {
++        long[] out = new long[count];
++        for (int i = 0; i < count; i++) {
++            out[i] = buffer[(head + i) % capacity];
++        }
++        return out;
++    }
++
++    /**
++     * Clears buffer.
++     */
++    public synchronized void clear() {
++        head = 0;
++        count = 0;
++        sum = 0L;
++    }
++}
+diff --git a/src/main/java/org/bxteam/divinemc/async/rct/TickPair.java b/src/main/java/org/bxteam/divinemc/async/rct/TickPair.java
+deleted file mode 100644
+index 73c8e38b680cab90332688128e5d57bf6889ae64..0000000000000000000000000000000000000000
+--- a/src/main/java/org/bxteam/divinemc/async/rct/TickPair.java
++++ /dev/null
+@@ -1,7 +0,0 @@
+-package org.bxteam.divinemc.async.rct;
+-
+-import net.minecraft.world.entity.Entity;
+-
+-import java.util.Set;
+-
+-record TickPair(RegionData[] regions, Set<Entity> entities) { }
+diff --git a/src/main/java/org/bxteam/divinemc/async/rct/UnionFind.java b/src/main/java/org/bxteam/divinemc/async/rct/UnionFind.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..87c32a1005224f3beb251408b6f9c8a257627b33
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/async/rct/UnionFind.java
+@@ -0,0 +1,37 @@
++package org.bxteam.divinemc.async.rct;
++
++final class UnionFind {
++    private final int[] parent;
++    private final int[] rank;
++
++    UnionFind(int size) {
++        parent = new int[size];
++        rank = new int[size];
++        for (int i = 0; i < size; i++) {
++            parent[i] = i;
++            rank[i] = 0;
++        }
++    }
++
++    int find(int x) {
++        if (parent[x] != x) {
++            parent[x] = find(parent[x]);
++        }
++        return parent[x];
++    }
++
++    void union(int x, int y) {
++        int px = find(x);
++        int py = find(y);
++        if (px != py) {
++            if (rank[px] < rank[py]) {
++                parent[px] = py;
++            } else if (rank[px] > rank[py]) {
++                parent[py] = px;
++            } else {
++                parent[py] = px;
++                rank[px]++;
++            }
++        }
++    }
++}
+diff --git a/src/main/java/org/bxteam/divinemc/command/DivineCommand.java b/src/main/java/org/bxteam/divinemc/command/DivineCommand.java
+index 2a16973471a07c8f92a1797738bcdc5cca22e164..4363cb6e1b79c2d0c2903cf96777071b59dc1666 100644
+--- a/src/main/java/org/bxteam/divinemc/command/DivineCommand.java
++++ b/src/main/java/org/bxteam/divinemc/command/DivineCommand.java
+@@ -29,12 +29,14 @@ public final class DivineCommand extends Command {
+     private static final DivineSubCommand MSPT_SUBCOMMAND = new MSPTCommand();
+     private static final DivineSubCommand RELOAD_SUBCOMMAND = new ReloadCommand();
+     private static final DivineSubCommand VERSION_SUBCOMMAND = new VersionCommand();
++    private static final DivineSubCommand TICK_TIMES_SUBCOMMAND = new TickTimes();
+     private static final Map<String, DivineSubCommand> SUBCOMMANDS = Util.make(() -> {
+         final Map<Set<String>, DivineSubCommand> commands = new HashMap<>();
+ 
+         commands.put(Set.of(MSPTCommand.LITERAL_ARGUMENT), MSPT_SUBCOMMAND);
+         commands.put(Set.of(ReloadCommand.LITERAL_ARGUMENT), RELOAD_SUBCOMMAND);
+         commands.put(Set.of(VersionCommand.LITERAL_ARGUMENT), VERSION_SUBCOMMAND);
++        commands.put(Set.of(TickTimes.LITERAL_ARGUMENT), TICK_TIMES_SUBCOMMAND);
+ 
+         return commands.entrySet().stream()
+                 .flatMap(entry -> entry.getKey().stream().map(s -> Map.entry(s, entry.getValue())))
+diff --git a/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java b/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..1bcd5d5825b2aa5ab9586e48b047f7ab9b5bec03
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
+@@ -0,0 +1,121 @@
++package org.bxteam.divinemc.command.subcommands;
++
++import net.kyori.adventure.text.Component;
++import net.kyori.adventure.text.event.ClickCallback;
++import net.kyori.adventure.text.event.ClickEvent;
++import net.kyori.adventure.text.format.NamedTextColor;
++import net.minecraft.server.MinecraftServer;
++import net.minecraft.server.level.ServerPlayer;
++import org.bukkit.command.CommandSender;
++import org.bukkit.craftbukkit.entity.CraftPlayer;
++import org.bukkit.permissions.PermissionDefault;
++import org.bxteam.divinemc.command.DivineCommand;
++import org.bxteam.divinemc.command.DivineSubCommandPermission;
++import org.jetbrains.annotations.NotNull;
++
++import java.text.DecimalFormat;
++import java.time.Duration;
++import java.util.List;
++import java.util.Map;
++import java.util.stream.Collectors;
++
++import static net.kyori.adventure.text.Component.empty;
++import static net.kyori.adventure.text.Component.text;
++import static net.kyori.adventure.text.format.NamedTextColor.*;
++
++public final class TickTimes extends DivineSubCommandPermission {
++    public static final String LITERAL_ARGUMENT = "ticktimes";
++    public static final String PERM = DivineCommand.BASE_PERM + "." + LITERAL_ARGUMENT;
++    private static final DecimalFormat DF = new DecimalFormat("########0.0");
++    private static final Component SLASH = text("/");
++    private static final ClickCallback.Options options = ClickCallback.Options.builder().uses(-1).lifetime(Duration.ofMinutes(1)).build();
++
++    public TickTimes() {
++        super(PERM, PermissionDefault.OP);
++    }
++
++    @Override
++    public boolean execute(@NotNull CommandSender sender, @NotNull String subCommand, String @NotNull [] args) {
++        List<ServerPlayer> onlinePlayers = MinecraftServer.getServer().getPlayerList().players;
++
++        if (onlinePlayers.isEmpty()) {
++            sender.sendMessage(text("No players online.", NamedTextColor.GRAY));
++            return true;
++        }
++
++        Map<String, List<ServerPlayer>> playersByWorld = onlinePlayers.stream()
++            .collect(Collectors.groupingBy(p -> p.level().getWorld().getName()));
++
++        List<Map.Entry<String, List<ServerPlayer>>> sortedWorlds = playersByWorld.entrySet().stream()
++            .sorted((e1, e2) -> Integer.compare(e2.getValue().size(), e1.getValue().size()))
++            .toList();
++
++        sender.sendMessage(text("━━━━━━━━━━━━━ ", GOLD)
++            .append(text("Player Tick Times ", YELLOW))
++            .append(text("(last/1s/5s)", NamedTextColor.GRAY))
++            .append(text(" ━━━━━━━━━━━━━", GOLD)));
++
++        for (int i = 0; i < sortedWorlds.size(); i++) {
++            Map.Entry<String, List<ServerPlayer>> entry = sortedWorlds.get(i);
++            String worldName = entry.getKey();
++            List<ServerPlayer> players = entry.getValue();
++
++            players.sort((p1, p2) -> Double.compare(
++                p2.avgTickTimeNanos.average().orElse(0),
++                p1.avgTickTimeNanos.average().orElse(0)
++            ));
++
++            sender.sendMessage(text("➤ ", YELLOW)
++                .append(text(worldName, GOLD))
++                .append(text(" (" + players.size() + " players)", GRAY)));
++
++            for (ServerPlayer player : players) {
++                double last = player.avgTickTimeNanos.last().orElse(0) * 1.0E-6;
++                double avg1s = player.avgTickTimeNanos.averageLast(20).orElse(0.0) * 1.0E-6;
++                double avg5s = player.avgTickTimeNanos.average().orElse(0.0) * 1.0E-6;
++
++                Component stats = text(" [", GRAY)
++                    .append(getColoredValue(last))
++                    .append(SLASH)
++                    .append(getColoredValue(avg1s))
++                    .append(SLASH)
++                    .append(getColoredValue(avg5s))
++                    .append(text("]", GRAY));
++
++                Component hover = text("Last region size: ", GRAY)
++                    .append(text(player.lastRegionChunkSize, GREEN))
++                    .appendNewline()
++                    .append(text("Last region entity amount: ", GRAY))
++                    .append(text(player.lastRegionEntityAmount, GREEN));
++
++                Component playerLine = text("  - ", GRAY)
++                    .append(text(player.displayName, AQUA)
++                        .hoverEvent(text("Click to teleport", GREEN))
++                        .clickEvent(ClickEvent.callback(audience -> {
++                            if (audience instanceof CraftPlayer sourcePlayer) {
++                                MinecraftServer.getServer().execute(() -> sourcePlayer.teleport(player.getBukkitEntity().getLocation()));
++                            }
++                        }, options))
++                    )
++                    .append(stats.hoverEvent(hover));
++
++                sender.sendMessage(playerLine);
++            }
++
++            if (i < sortedWorlds.size() - 1) {
++                sender.sendMessage(empty());
++            }
++        }
++
++        return true;
++    }
++
++    private static Component getColoredValue(double value) {
++        NamedTextColor color = value >= 50 ? RED
++            : value >= 40 ? YELLOW
++              : value >= 30 ? GOLD
++                : value >= 20 ? GREEN
++                  : AQUA;
++        return text(DF.format(value) + "ms", color);
++    }
++}
+diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
+index 7458803cbde776fac0a340b6f96aeb10be65c47e..0e62d56e1fac233899720fcb4683751aa347d0a5 100644
+--- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
++++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
+@@ -231,6 +231,10 @@ public class DivineConfig {
+         public static boolean enableAsyncSpawning = true;
+         public static boolean asyncNaturalSpawn = true;
+ 
++        public static boolean waypoints = false; // BasiclandMC optimize defaults
++
++        public static boolean RCTorPWT = false;
++
+         public static void load() {
+             parallelWorldTicking();
+             regionizedChunkTicking();
+@@ -239,6 +243,8 @@ public class DivineConfig {
+             asyncJoinSettings();
+             asyncChunkSending();
+             asyncMobSpawning();
++            waypoints();
++            RCTorPWT = enableRegionizedChunkTicking || enableParallelWorldTicking;
+         }
+ 
+         private static void parallelWorldTicking() {
+@@ -269,9 +275,9 @@ public class DivineConfig {
+             regionizedChunkTickingExecutorThreadPriority = getInt(ConfigCategory.ASYNC.key("regionized-chunk-ticking.executor-thread-priority"), regionizedChunkTickingExecutorThreadPriority,
+                 "Configures the thread priority of the executor");
+ 
+-            if (regionizedChunkTickingExecutorThreadCount < 1 || regionizedChunkTickingExecutorThreadCount > 10) {
+-                LOGGER.warn("Invalid regionized chunk ticking thread count: {}, resetting to default (4)", regionizedChunkTickingExecutorThreadCount);
+-                regionizedChunkTickingExecutorThreadCount = 4;
++            if (regionizedChunkTickingExecutorThreadCount < 1 || regionizedChunkTickingExecutorThreadCount > 32) {
++                LOGGER.warn("Invalid regionized chunk ticking thread count: {}, resetting to default (6)", regionizedChunkTickingExecutorThreadCount);
++                regionizedChunkTickingExecutorThreadCount = 6;
+             }
+         }
+ 
+@@ -360,6 +366,11 @@ public class DivineConfig {
+             asyncNaturalSpawn = getBoolean(ConfigCategory.ASYNC.key("async-ticking-of-natural-spawns"), asyncNaturalSpawn,
+                 "Enables offloading of natural spawning to a different thread");
+         }
++
++        private static void waypoints() {
++            waypoints = getBoolean(ConfigCategory.ASYNC.key("waypoints.enable"), waypoints,
++                "Fully enables or disables waypoints");
++        }
+     }
+ 
+     public static class PerformanceCategory {

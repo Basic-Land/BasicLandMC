@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Sat, 25 Apr 2026 18:53:31 +0200
+Subject: [PATCH] rct
+
+
+diff --git a/net/minecraft/server/level/ServerChunkCache.java b/net/minecraft/server/level/ServerChunkCache.java
+index fb77decd3cc54f487c987789f6faf2e6b2455535..32c9c217c6620a65c9e704f95381f5367ede4d58 100644
+--- a/net/minecraft/server/level/ServerChunkCache.java
++++ b/net/minecraft/server/level/ServerChunkCache.java
+@@ -54,7 +54,7 @@ import net.minecraft.world.level.storage.LevelStorageSource;
+ import org.slf4j.Logger;
+ 
+ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moonrise.patches.chunk_system.world.ChunkSystemServerChunkCache { // Paper - rewrite chunk system
+-    private static final Logger LOGGER = LogUtils.getLogger();
++    protected static final Logger LOGGER = LogUtils.getLogger(); // private -> protected - DivineMC
+     private final DistanceManager distanceManager;
+     protected final ServerLevel level; // DivineMC - Regionized Chunk Ticking - private -> protected
+     public final Thread mainThread;
+diff --git a/net/minecraft/server/level/ServerPlayer.java b/net/minecraft/server/level/ServerPlayer.java
+index a22c70779239930627ef92df21e83148bb348e8d..6f433aea49eead226590484792a351cc06f6dc0c 100644
+--- a/net/minecraft/server/level/ServerPlayer.java
++++ b/net/minecraft/server/level/ServerPlayer.java
+@@ -431,13 +431,8 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+     private boolean ramBar = false; // Purpur - Implement rambar commands
+     public boolean smoothWorldTeleport; // DivineMC - Smooth teleport API
+     public boolean hasTickedAtLeastOnceInNewWorld = false; // DivineMC - Parallel world ticking
+-    public final it.unimi.dsi.fastutil.longs.LongArrayList avgTickTimeNanos = new it.unimi.dsi.fastutil.longs.LongArrayList(100) {
+-        @Override
+-        public boolean add(long k) {
+-            if (size() >= 100) removeLong(0);
+-            return super.add(k);
+-        }
+-    }; // DivineMC - tick time averaging
++    public final org.bxteam.divinemc.async.rct.RollingLongBuffer avgTickTimeNanos = new org.bxteam.divinemc.async.rct.RollingLongBuffer(100); // DivineMC - Region tick time tracking
++    public int lastRegionChunkSize, lastRegionEntityAmount = 0;
+ 
+     // Paper start - rewrite chunk system
+     private ca.spottedleaf.moonrise.patches.chunk_system.player.RegionizedPlayerChunkLoader.PlayerChunkLoaderData chunkLoader;
