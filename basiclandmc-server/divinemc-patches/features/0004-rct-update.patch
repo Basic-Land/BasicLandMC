@@ -780,10 +780,10 @@ index 2a16973471a07c8f92a1797738bcdc5cca22e164..4363cb6e1b79c2d0c2903cf96777071b
                  .flatMap(entry -> entry.getKey().stream().map(s -> Map.entry(s, entry.getValue())))
 diff --git a/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java b/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..1bcd5d5825b2aa5ab9586e48b047f7ab9b5bec03
+index 0000000000000000000000000000000000000000..0cb64ea7bb1d705cc722f7bf11ee048d7337edcb
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
-@@ -0,0 +1,121 @@
+@@ -0,0 +1,149 @@
 +package org.bxteam.divinemc.command.subcommands;
 +
 +import net.kyori.adventure.text.Component;
@@ -801,6 +801,8 @@ index 0000000000000000000000000000000000000000..1bcd5d5825b2aa5ab9586e48b047f7ab
 +
 +import java.text.DecimalFormat;
 +import java.time.Duration;
++import java.util.ArrayList;
++import java.util.LinkedHashMap;
 +import java.util.List;
 +import java.util.Map;
 +import java.util.stream.Collectors;
@@ -816,6 +818,8 @@ index 0000000000000000000000000000000000000000..1bcd5d5825b2aa5ab9586e48b047f7ab
 +    private static final Component SLASH = text("/");
 +    private static final ClickCallback.Options options = ClickCallback.Options.builder().uses(-1).lifetime(Duration.ofMinutes(1)).build();
 +
++    private record RegionStatsKey(int chunkSize, int entityAmount) {}
++
 +    public TickTimes() {
 +        super(PERM, PermissionDefault.OP);
 +    }
@@ -830,7 +834,7 @@ index 0000000000000000000000000000000000000000..1bcd5d5825b2aa5ab9586e48b047f7ab
 +        }
 +
 +        Map<String, List<ServerPlayer>> playersByWorld = onlinePlayers.stream()
-+            .collect(Collectors.groupingBy(p -> p.level().getWorld().getName()));
++            .collect(Collectors.groupingBy(p -> p.getBukkitEntity().getWorld().getName()));
 +
 +        List<Map.Entry<String, List<ServerPlayer>>> sortedWorlds = playersByWorld.entrySet().stream()
 +            .sorted((e1, e2) -> Integer.compare(e2.getValue().size(), e1.getValue().size()))
@@ -851,14 +855,31 @@ index 0000000000000000000000000000000000000000..1bcd5d5825b2aa5ab9586e48b047f7ab
 +                p1.avgTickTimeNanos.average().orElse(0)
 +            ));
 +
++            Map<RegionStatsKey, List<ServerPlayer>> playersByRegionStats = new LinkedHashMap<>();
++            for (ServerPlayer player : players) {
++                RegionStatsKey key = new RegionStatsKey(player.lastRegionChunkSize, player.lastRegionEntityAmount);
++                playersByRegionStats.computeIfAbsent(key, ignored -> new ArrayList<>()).add(player);
++            }
++
 +            sender.sendMessage(text("➤ ", YELLOW)
 +                .append(text(worldName, GOLD))
 +                .append(text(" (" + players.size() + " players)", GRAY)));
 +
-+            for (ServerPlayer player : players) {
-+                double last = player.avgTickTimeNanos.last().orElse(0) * 1.0E-6;
-+                double avg1s = player.avgTickTimeNanos.averageLast(20).orElse(0.0) * 1.0E-6;
-+                double avg5s = player.avgTickTimeNanos.average().orElse(0.0) * 1.0E-6;
++            for (List<ServerPlayer> group : playersByRegionStats.values()) {
++                ServerPlayer firstPlayer = group.getFirst();
++                double last = 0.0;
++                double avg1s = 0.0;
++                double avg5s = 0.0;
++
++                for (ServerPlayer player : group) {
++                    last += player.avgTickTimeNanos.last().orElse(0L);
++                    avg1s += player.avgTickTimeNanos.averageLast(20).orElse(0L);
++                    avg5s += player.avgTickTimeNanos.average().orElse(0L);
++                }
++
++                last = last / group.size() * 1.0E-6;
++                avg1s = avg1s / group.size() * 1.0E-6;
++                avg5s = avg5s / group.size() * 1.0E-6;
 +
 +                Component stats = text(" [", GRAY)
 +                    .append(getColoredValue(last))
@@ -869,19 +890,26 @@ index 0000000000000000000000000000000000000000..1bcd5d5825b2aa5ab9586e48b047f7ab
 +                    .append(text("]", GRAY));
 +
 +                Component hover = text("Last region size: ", GRAY)
-+                    .append(text(player.lastRegionChunkSize, GREEN))
++                    .append(text(firstPlayer.lastRegionChunkSize, GREEN))
 +                    .appendNewline()
 +                    .append(text("Last region entity amount: ", GRAY))
-+                    .append(text(player.lastRegionEntityAmount, GREEN));
++                    .append(text(firstPlayer.lastRegionEntityAmount, GREEN))
++                    .appendNewline()
++                    .append(text("Grouped players: ", GRAY))
++                    .append(text(group.size(), GREEN));
 +
 +                Component playerLine = text("  - ", GRAY)
-+                    .append(text(player.displayName, AQUA)
-+                        .hoverEvent(text("Click to teleport", GREEN))
-+                        .clickEvent(ClickEvent.callback(audience -> {
-+                            if (audience instanceof CraftPlayer sourcePlayer) {
-+                                MinecraftServer.getServer().execute(() -> sourcePlayer.teleport(player.getBukkitEntity().getLocation()));
-+                            }
-+                        }, options))
++                    .append(group.stream()
++                        .map(player -> text(player.displayName, AQUA)
++                            .hoverEvent(text("Click to teleport", GREEN))
++                            .clickEvent(ClickEvent.callback(audience -> {
++                                if (audience instanceof CraftPlayer sourcePlayer) {
++                                    MinecraftServer.getServer().execute(() -> sourcePlayer.teleport(player.getBukkitEntity().getLocation()));
++                                }
++                            }, options))
++                        )
++                        .reduce((left, right) -> left.append(text(", ", GRAY)).append(right))
++                        .orElseGet(Component::empty)
 +                    )
 +                    .append(stats.hoverEvent(hover));
 +
