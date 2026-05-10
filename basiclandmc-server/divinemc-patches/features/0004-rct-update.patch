@@ -149,7 +149,7 @@ index ceddc92b4914efa42568f1538d4997523fe8a531..00000000000000000000000000000000
 -    }
 -}
 diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
-index d308a0447bba1ccd7834823b8d70f3f5980490c5..321a1a178283dfcf52a73170bc015573e7ce1c0c 100644
+index d308a0447bba1ccd7834823b8d70f3f5980490c5..a5cd651eabdc842a44a01af503fca415e5e47f4a 100644
 --- a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
 +++ b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
 @@ -3,15 +3,13 @@ package org.bxteam.divinemc.async.rct;
@@ -170,7 +170,7 @@ index d308a0447bba1ccd7834823b8d70f3f5980490c5..321a1a178283dfcf52a73170bc015573
  import net.minecraft.server.level.ServerChunkCache;
  import net.minecraft.server.level.ServerLevel;
  import net.minecraft.server.level.ServerPlayer;
-@@ -27,70 +25,68 @@ import net.minecraft.world.level.storage.DimensionDataStorage;
+@@ -27,70 +25,72 @@ import net.minecraft.world.level.storage.DimensionDataStorage;
  import net.minecraft.world.level.storage.LevelStorageSource;
  import org.bxteam.divinemc.config.DivineConfig;
  import org.bxteam.divinemc.util.NamedAgnosticThreadFactory;
@@ -198,6 +198,7 @@ index d308a0447bba1ccd7834823b8d70f3f5980490c5..321a1a178283dfcf52a73170bc015573
 +        new NamedAgnosticThreadFactory<>("Region Ticking", TickThread::new, DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadPriority));
 +    private static final int LOG_INTERVAL = 18000;
 +    private final AvgTimeLogger avgTimeLogger;
++    public final RollingLongBuffer avgTime = new RollingLongBuffer(100);
 +    private int i = 0;
  
      public RegionizedChunkTicking(final ServerLevel level, final LevelStorageSource.LevelStorageAccess levelStorageAccess, final DataFixer fixerUpper, final StructureTemplateManager structureManager, final Executor dispatcher, final ChunkGenerator generator, final int viewDistance, final int simulationDistance, final boolean sync, final ChunkProgressListener progressListener, final ChunkStatusUpdateListener chunkStatusListener, final Supplier<DimensionDataStorage> overworldDataStorage) {
@@ -209,6 +210,7 @@ index d308a0447bba1ccd7834823b8d70f3f5980490c5..321a1a178283dfcf52a73170bc015573
 -        final TickPair tickPair = computePlayerRegionsParallel();
 +    @Override
 +    protected void iterateTickingChunksFaster(final @NotNull CompletableFuture<Void> spawns) {
++        final long start = System.nanoTime();
 +        final ServerLevel world = this.level;
 +        final int randomTickSpeed = world.getGameRules().getInt(GameRules.RULE_RANDOMTICKING);
 +        final LevelChunk[] raw = world.moonrise$getEntityTickingChunks().toArray(new LevelChunk[0]);
@@ -237,6 +239,8 @@ index d308a0447bba1ccd7834823b8d70f3f5980490c5..321a1a178283dfcf52a73170bc015573
 -        }, REGION_EXECUTOR).join();
 +        finishTicking(futures, randomTickSpeed, raw, tickPair);
 +        spawns.join();
++        final long end = System.nanoTime();
++        avgTime.add(end - start);
      }
  
      private CompletableFuture<LongOpenHashSet> tick(RegionData region, int randomTickSpeed) {
@@ -272,7 +276,7 @@ index d308a0447bba1ccd7834823b8d70f3f5980490c5..321a1a178283dfcf52a73170bc015573
              return regionChunksIDs;
          }, REGION_EXECUTOR);
      }
-@@ -102,15 +98,31 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+@@ -102,15 +102,31 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
              LOGGER.error("Error during region chunk ticking", ex.getCause());
          }
  
@@ -307,7 +311,7 @@ index d308a0447bba1ccd7834823b8d70f3f5980490c5..321a1a178283dfcf52a73170bc015573
                  }
              }
          }
-@@ -126,119 +138,175 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+@@ -126,119 +142,175 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
          }
      }
  
@@ -780,10 +784,10 @@ index 2a16973471a07c8f92a1797738bcdc5cca22e164..4363cb6e1b79c2d0c2903cf96777071b
                  .flatMap(entry -> entry.getKey().stream().map(s -> Map.entry(s, entry.getValue())))
 diff --git a/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java b/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..0cb64ea7bb1d705cc722f7bf11ee048d7337edcb
+index 0000000000000000000000000000000000000000..f37d42bd9c9b98e260c4115302e96ef45a324c24
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,179 @@
 +package org.bxteam.divinemc.command.subcommands;
 +
 +import net.kyori.adventure.text.Component;
@@ -791,21 +795,21 @@ index 0000000000000000000000000000000000000000..0cb64ea7bb1d705cc722f7bf11ee048d
 +import net.kyori.adventure.text.event.ClickEvent;
 +import net.kyori.adventure.text.format.NamedTextColor;
 +import net.minecraft.server.MinecraftServer;
++import net.minecraft.server.level.ServerLevel;
 +import net.minecraft.server.level.ServerPlayer;
 +import org.bukkit.command.CommandSender;
 +import org.bukkit.craftbukkit.entity.CraftPlayer;
 +import org.bukkit.permissions.PermissionDefault;
++import org.bxteam.divinemc.async.rct.RegionizedChunkTicking;
++import org.bxteam.divinemc.async.rct.RollingLongBuffer;
 +import org.bxteam.divinemc.command.DivineCommand;
 +import org.bxteam.divinemc.command.DivineSubCommandPermission;
++import org.bxteam.divinemc.config.DivineConfig;
 +import org.jetbrains.annotations.NotNull;
 +
 +import java.text.DecimalFormat;
 +import java.time.Duration;
-+import java.util.ArrayList;
-+import java.util.LinkedHashMap;
-+import java.util.List;
-+import java.util.Map;
-+import java.util.stream.Collectors;
++import java.util.*;
 +
 +import static net.kyori.adventure.text.Component.empty;
 +import static net.kyori.adventure.text.Component.text;
@@ -826,6 +830,12 @@ index 0000000000000000000000000000000000000000..0cb64ea7bb1d705cc722f7bf11ee048d
 +
 +    @Override
 +    public boolean execute(@NotNull CommandSender sender, @NotNull String subCommand, String @NotNull [] args) {
++        if (!DivineConfig.AsyncCategory.enableRegionizedChunkTicking) {
++            sender.sendMessage(Component.text("Per-world tick times tracking is only available when regionized chunk ticking is enabled.", RED));
++            sender.sendMessage(Component.text("Please enable it in divinemc.yml to use this command.", GRAY));
++            return true;
++        }
++
 +        List<ServerPlayer> onlinePlayers = MinecraftServer.getServer().getPlayerList().players;
 +
 +        if (onlinePlayers.isEmpty()) {
@@ -833,22 +843,31 @@ index 0000000000000000000000000000000000000000..0cb64ea7bb1d705cc722f7bf11ee048d
 +            return true;
 +        }
 +
-+        Map<String, List<ServerPlayer>> playersByWorld = onlinePlayers.stream()
-+            .collect(Collectors.groupingBy(p -> p.getBukkitEntity().getWorld().getName()));
++        TreeMap<ServerLevel, List<ServerPlayer>> playersByWorld = new TreeMap<>(
++            Comparator.<ServerLevel>comparingInt(level -> level.players().size())
++                .reversed()
++                .thenComparing(Comparator.<ServerLevel>comparingDouble(level -> ((RegionizedChunkTicking) level.chunkSource).avgTime.average().orElse(0)).reversed())
++                .thenComparing(level -> level.serverLevelData.getLevelName())
++        );
 +
-+        List<Map.Entry<String, List<ServerPlayer>>> sortedWorlds = playersByWorld.entrySet().stream()
-+            .sorted((e1, e2) -> Integer.compare(e2.getValue().size(), e1.getValue().size()))
-+            .toList();
++        for (ServerLevel level : MinecraftServer.getServer().getAllLevels()) {
++            List<ServerPlayer> players = level.players();
++            if (!players.isEmpty()) {
++                playersByWorld.put(level, new ArrayList<>(players));
++            }
++        }
 +
 +        sender.sendMessage(text("━━━━━━━━━━━━━ ", GOLD)
 +            .append(text("Player Tick Times ", YELLOW))
 +            .append(text("(last/1s/5s)", NamedTextColor.GRAY))
 +            .append(text(" ━━━━━━━━━━━━━", GOLD)));
 +
-+        for (int i = 0; i < sortedWorlds.size(); i++) {
-+            Map.Entry<String, List<ServerPlayer>> entry = sortedWorlds.get(i);
-+            String worldName = entry.getKey();
++        int i = 0;
++        for (Map.Entry<ServerLevel, List<ServerPlayer>> entry : playersByWorld.entrySet()) {
++            ServerLevel level = entry.getKey();
++            String worldName = level.serverLevelData.getLevelName();
 +            List<ServerPlayer> players = entry.getValue();
++            RollingLongBuffer average = ((RegionizedChunkTicking) level.chunkSource).avgTime;
 +
 +            players.sort((p1, p2) -> Double.compare(
 +                p2.avgTickTimeNanos.average().orElse(0),
@@ -863,31 +882,31 @@ index 0000000000000000000000000000000000000000..0cb64ea7bb1d705cc722f7bf11ee048d
 +
 +            sender.sendMessage(text("➤ ", YELLOW)
 +                .append(text(worldName, GOLD))
-+                .append(text(" (" + players.size() + " players)", GRAY)));
++                .append(text(" (" + players.size() + " players)", GRAY))
++                .append(stats(average))
++                .hoverEvent(text("Region amount: " + playersByRegionStats.size(), GREEN)));
 +
 +            for (List<ServerPlayer> group : playersByRegionStats.values()) {
++                Component stats;
 +                ServerPlayer firstPlayer = group.getFirst();
-+                double last = 0.0;
-+                double avg1s = 0.0;
-+                double avg5s = 0.0;
++                if (group.size() == 1) {
++                    stats = stats(firstPlayer.avgTickTimeNanos);
++                } else {
++                    double last = 0.0;
++                    double avg1s = 0.0;
++                    double avg5s = 0.0;
 +
-+                for (ServerPlayer player : group) {
-+                    last += player.avgTickTimeNanos.last().orElse(0L);
-+                    avg1s += player.avgTickTimeNanos.averageLast(20).orElse(0L);
-+                    avg5s += player.avgTickTimeNanos.average().orElse(0L);
++                    for (ServerPlayer player : group) {
++                        last += player.avgTickTimeNanos.last().orElse(0L);
++                        avg1s += player.avgTickTimeNanos.averageLast(20).orElse(0L);
++                        avg5s += player.avgTickTimeNanos.average().orElse(0L);
++                    }
++
++                    last = last / group.size() * 1.0E-6;
++                    avg1s = avg1s / group.size() * 1.0E-6;
++                    avg5s = avg5s / group.size() * 1.0E-6;
++                    stats = stats(last, avg1s, avg5s);
 +                }
-+
-+                last = last / group.size() * 1.0E-6;
-+                avg1s = avg1s / group.size() * 1.0E-6;
-+                avg5s = avg5s / group.size() * 1.0E-6;
-+
-+                Component stats = text(" [", GRAY)
-+                    .append(getColoredValue(last))
-+                    .append(SLASH)
-+                    .append(getColoredValue(avg1s))
-+                    .append(SLASH)
-+                    .append(getColoredValue(avg5s))
-+                    .append(text("]", GRAY));
 +
 +                Component hover = text("Last region size: ", GRAY)
 +                    .append(text(firstPlayer.lastRegionChunkSize, GREEN))
@@ -916,12 +935,27 @@ index 0000000000000000000000000000000000000000..0cb64ea7bb1d705cc722f7bf11ee048d
 +                sender.sendMessage(playerLine);
 +            }
 +
-+            if (i < sortedWorlds.size() - 1) {
++            if (i < playersByWorld.size() - 1) {
 +                sender.sendMessage(empty());
 +            }
++            i++;
 +        }
 +
 +        return true;
++    }
++
++    private Component stats(RollingLongBuffer buffer) {
++        return stats(buffer.last().orElse(0L) * 1.0E-6, buffer.averageLast(20).orElse(0L) * 1.0E-6, buffer.average().orElse(0L) * 1.0E-6);
++    }
++
++    private Component stats(double last, double avg1s, double avg5s) {
++        return text(" [", GRAY)
++            .append(getColoredValue(last))
++            .append(SLASH)
++            .append(getColoredValue(avg1s))
++            .append(SLASH)
++            .append(getColoredValue(avg5s))
++            .append(text("]", GRAY));
 +    }
 +
 +    private static Component getColoredValue(double value) {
