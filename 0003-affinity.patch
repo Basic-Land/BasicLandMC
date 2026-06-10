@@ -1,0 +1,119 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Tue, 9 Jun 2026 23:15:48 +0200
+Subject: [PATCH] affinity
+
+
+diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
+index 73ac65879fff1358e5844147710105ccf14cbd8e..4d31a3964b4d9f8569b7fc4ab77d3e61abd1f5f7 100644
+--- a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
++++ b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
+@@ -22,6 +22,8 @@ import net.minecraft.world.level.gamerules.GameRules;
+ import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+ import net.minecraft.world.level.storage.DimensionDataStorage;
+ import net.minecraft.world.level.storage.LevelStorageSource;
++import net.openhft.affinity.Affinity;
++import net.openhft.affinity.AffinityLock;
+ import org.bxteam.divinemc.config.DivineConfig;
+ import org.bxteam.divinemc.util.NamedAgnosticThreadFactory;
+ import org.jetbrains.annotations.NotNull;
+@@ -32,8 +34,26 @@ import java.util.concurrent.*;
+ import java.util.function.Supplier;
+ 
+ public final class RegionizedChunkTicking extends ServerChunkCache {
+-    public static final Executor REGION_EXECUTOR = Executors.newFixedThreadPool(DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadCount,
+-        new NamedAgnosticThreadFactory<>("Region Ticking", TickThread::new, DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadPriority));
++    public static final ThreadPoolExecutor REGION_EXECUTOR;
++    static {
++        final int threads = DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadCount;
++        int nbits = Runtime.getRuntime().availableProcessors();
++        BitSet affinity = new BitSet(nbits);
++        for (int i = 0; i < nbits; i++) {
++            if (i % 2 == 1)
++                affinity.set(i);
++        }
++
++        Affinity.setAffinity(affinity);
++
++        final NamedAgnosticThreadFactory<?> factory = new NamedAgnosticThreadFactory<>("Region Ticking", TickThread::new,
++            DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadPriority, true);
++        ThreadPoolExecutor exec = new ThreadPoolExecutor(threads, threads, 0L, TimeUnit.MILLISECONDS,
++            new LinkedBlockingQueue<>(), factory);
++        exec.prestartAllCoreThreads();
++        REGION_EXECUTOR = exec;
++        LOGGER.info(AffinityLock.dumpLocks());
++    }
+     private static final int LOG_INTERVAL = 18000;
+     private final AvgTimeLogger avgTimeLogger;
+     public final RollingLongBuffer avgTime = new RollingLongBuffer(100);
+diff --git a/src/main/java/org/bxteam/divinemc/util/NamedAgnosticThreadFactory.java b/src/main/java/org/bxteam/divinemc/util/NamedAgnosticThreadFactory.java
+index 3522fadbb98227dddc8f8088398215074c786e49..20ff708c8a71a55a993dfa1aaa682e6db30e114c 100644
+--- a/src/main/java/org/bxteam/divinemc/util/NamedAgnosticThreadFactory.java
++++ b/src/main/java/org/bxteam/divinemc/util/NamedAgnosticThreadFactory.java
+@@ -1,8 +1,12 @@
+ package org.bxteam.divinemc.util;
+ 
+ import com.mojang.logging.LogUtils;
++import net.openhft.affinity.AffinityLock;
++import net.openhft.affinity.AffinityStrategies;
++import net.openhft.affinity.AffinityStrategy;
+ import org.bxteam.divinemc.spark.ThreadDumperRegistry;
+ import org.jetbrains.annotations.NotNull;
++import org.jetbrains.annotations.Nullable;
+ import org.slf4j.Logger;
+ 
+ import java.util.concurrent.ThreadFactory;
+@@ -15,18 +19,37 @@ public class NamedAgnosticThreadFactory<T extends Thread> implements ThreadFacto
+     private final String namePrefix;
+     private final ThreadBuilderFunction<T> typeOfThread;
+     private final int priority;
++    private final boolean useAffinity;
++    @NotNull
++    private final AffinityStrategy[] strategies;
++    @Nullable
++    private AffinityLock lastAffinityLock = null;
+ 
+     public NamedAgnosticThreadFactory(String name, ThreadBuilderFunction<T> typeOfThread, int priority) {
++        this(name, typeOfThread, priority, false);
++    }
++
++    public NamedAgnosticThreadFactory(String name, ThreadBuilderFunction<T> typeOfThread, int priority, boolean useAffinity, AffinityStrategy... strategies) {
+         this.typeOfThread = typeOfThread;
+         this.priority = priority;
++        this.useAffinity = useAffinity;
+         this.group = Thread.currentThread().getThreadGroup();
+         this.namePrefix = name + "-";
++        this.strategies = strategies == null || strategies.length == 0 ? new AffinityStrategy[]{AffinityStrategies.ANY} : strategies;
+         ThreadDumperRegistry.REGISTRY.add(namePrefix);
+     }
+ 
+     @Override
+     public Thread newThread(@NotNull Runnable runnable) {
+-        T thread = typeOfThread.apply(this.group, runnable, this.namePrefix + this.threadNumber.getAndIncrement());
++        final Runnable wrapped = useAffinity ? () -> {
++            try (AffinityLock ignored = acquireLockBasedOnLast()) {
++                //noinspection ConstantValue
++                assert ignored != null;
++                runnable.run();
++            }
++        } : runnable;
++
++        T thread = typeOfThread.apply(this.group, wrapped, this.namePrefix + this.threadNumber.getAndIncrement());
+         thread.setUncaughtExceptionHandler((threadx, throwable) -> {
+             LOGGER.error("Caught exception in thread {} from {}", threadx, runnable);
+             LOGGER.error("", throwable);
+@@ -38,6 +61,14 @@ public class NamedAgnosticThreadFactory<T extends Thread> implements ThreadFacto
+         return thread;
+     }
+ 
++    private synchronized AffinityLock acquireLockBasedOnLast() {
++        AffinityLock al = lastAffinityLock == null ? AffinityLock.acquireLock(false) : lastAffinityLock.acquireLock(strategies);
++        al.bind();
++        if (al.cpuId() >= 0)
++            lastAffinityLock = al;
++        return al;
++    }
++
+     public interface ThreadBuilderFunction<T extends Thread> {
+         T apply(ThreadGroup threadGroup, Runnable runnable, String name);
+     }

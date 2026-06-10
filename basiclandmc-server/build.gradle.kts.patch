@@ -78,6 +78,14 @@
  
      // DivineMC start - Dependencies
      implementation ("com.github.Carleslc.Simple-YAML:Simple-Yaml:1.8.4") {
+@@ -194,6 +_,7 @@
+     implementation("net.openhft:zero-allocation-hashing:0.16")
+     implementation("org.agrona:agrona:2.2.4")
+     implementation("net.objecthunter:exp4j:0.4.8")
++    implementation("net.openhft:affinity:2026.2")
+     // DivineMC end - Dependencies
+ 
+     implementation("ca.spottedleaf:concurrentutil:0.0.8")
 @@ -286,14 +_,14 @@
          val experimental = rootProject.providers.gradleProperty("experimental").get() // DivineMC - Experimental flag
          attributes(
