@@ -110,7 +110,7 @@ index c9f1e396cc7cfc91047e49d64b22585c5604a975..1b3170ca13a7b6ad4fc9302e060cbfee
              }
  
 diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
-index f1fce59d8e9b26b6dabe10bf23f8506743baf859..73ac65879fff1358e5844147710105ccf14cbd8e 100644
+index f1fce59d8e9b26b6dabe10bf23f8506743baf859..6041bdc88c8f8d1bd7364e4361c0d82cd61e75e9 100644
 --- a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
 +++ b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
 @@ -4,26 +4,12 @@ import ca.spottedleaf.moonrise.common.list.IteratorSafeOrderedReferenceSet;
@@ -177,20 +177,22 @@ index f1fce59d8e9b26b6dabe10bf23f8506743baf859..73ac65879fff1358e5844147710105cc
      }
  
      private CompletableFuture<LongOpenHashSet> tick(RegionData region, int randomTickSpeed) {
-@@ -103,7 +97,11 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+@@ -103,7 +97,13 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
              }
  
              final long end = System.nanoTime();
 -            region.players().forEach(player -> player.avgTickTimeNanos.add(end - start));
++            final int regionHash = region.hashCode();
 +            for (ServerPlayer player : region.players()) {
 +                player.avgTickTimeNanos.add(end - start);
 +                player.lastRegionChunkSize = regionChunksIDs.size();
 +                player.lastRegionEntityAmount = region.entities().size();
++                player.regionHash = regionHash;
 +            }
              return regionChunksIDs;
          }, REGION_EXECUTOR);
      }
-@@ -115,7 +113,7 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+@@ -115,7 +115,7 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
              LOGGER.error("Error during region chunk ticking", ex.getCause());
          }
  
@@ -199,7 +201,7 @@ index f1fce59d8e9b26b6dabe10bf23f8506743baf859..73ac65879fff1358e5844147710105cc
              REGION_EXECUTOR.execute(() -> {
                  StringBuilder sb = new StringBuilder();
                  for (RegionData regionData : tickPair.regions()) {
-@@ -238,9 +236,14 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+@@ -238,9 +238,14 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
          }
  
          i++;
@@ -217,6 +219,15 @@ index f1fce59d8e9b26b6dabe10bf23f8506743baf859..73ac65879fff1358e5844147710105cc
          }
  
          final Set<Entity> firstTick = ConcurrentHashMap.newKeySet();
+@@ -273,7 +278,7 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+             }
+         }
+ 
+-        regions.sort(Comparator.comparingDouble(r -> ((RegionData) r).players().stream().map(p -> p.avgTickTimeNanos.average().orElse(-1)).max(Comparator.naturalOrder()).orElse(-1d)).reversed());
++        regions.sort(Comparator.<RegionData>comparingDouble(r -> r.players().stream().map(p -> p.avgTickTimeNanos.average().orElse(-1)).max(Comparator.naturalOrder()).orElse(-1d)).reversed());
+         return new TickPair(regions.toArray(new RegionData[0]), firstTick);
+     }
+ 
 diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java b/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java
 index d47003554028a344fdeffe4584d78387dd9a8dcf..6ec65a95aead2fc32fb612ead1425ba7b25f0182 100644
 --- a/src/main/java/org/bxteam/divinemc/async/rct/RollingLongBuffer.java
@@ -289,7 +300,7 @@ index 86a95b17965ffe5fb0058f2d88091ebae9b35726..d57e59acd4d03bdebd68bdfbb9d6b936
                  .flatMap(entry -> entry.getKey().stream().map(s -> Map.entry(s, entry.getValue())))
 diff --git a/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java b/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..f37d42bd9c9b98e260c4115302e96ef45a324c24
+index 0000000000000000000000000000000000000000..85211d5b91aaa2482f536ac014815c6e2137d23a
 --- /dev/null
 +++ b/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
 @@ -0,0 +1,179 @@
@@ -327,7 +338,7 @@ index 0000000000000000000000000000000000000000..f37d42bd9c9b98e260c4115302e96ef4
 +    private static final Component SLASH = text("/");
 +    private static final ClickCallback.Options options = ClickCallback.Options.builder().uses(-1).lifetime(Duration.ofMinutes(1)).build();
 +
-+    private record RegionStatsKey(int chunkSize, int entityAmount) {}
++    private record RegionStatsKey(int chunkSize, int entityAmount, int regionHash) {}
 +
 +    public TickTimes() {
 +        super(PERM, PermissionDefault.OP);
@@ -381,7 +392,7 @@ index 0000000000000000000000000000000000000000..f37d42bd9c9b98e260c4115302e96ef4
 +
 +            Map<RegionStatsKey, List<ServerPlayer>> playersByRegionStats = new LinkedHashMap<>();
 +            for (ServerPlayer player : players) {
-+                RegionStatsKey key = new RegionStatsKey(player.lastRegionChunkSize, player.lastRegionEntityAmount);
++                RegionStatsKey key = new RegionStatsKey(player.lastRegionChunkSize, player.lastRegionEntityAmount, player.regionHash);
 +                playersByRegionStats.computeIfAbsent(key, ignored -> new ArrayList<>()).add(player);
 +            }
 +
