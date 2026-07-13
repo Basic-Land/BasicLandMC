@@ -1,15 +1,15 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: dan28000 <84990628+dan28000@users.noreply.github.com>
-Date: Sat, 14 Mar 2026 12:55:03 +0100
+Date: Mon, 13 Jul 2026 21:30:49 +0200
 Subject: [PATCH] optimize-defaults-for-divinemc-config
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index a95441732c887702eac011721f9f89334be87afc..3528eebdad4549e5bd2cfacc08a5157dad97cbd6 100644
+index 421939fcfc6facb70a051335e41da232c20d142f..8fba413be147e62eeb2d55d8e47d0c316201e944 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-@@ -190,8 +190,8 @@ public class DivineConfig {
-     public static class AsyncCategory {
+@@ -195,8 +195,8 @@ public class DivineConfig {
+ 
          // Parallel world ticking settings
          @Experimental("Parallel World Ticking")
 -        public static boolean enableParallelWorldTicking = false;
@@ -19,7 +19,7 @@ index a95441732c887702eac011721f9f89334be87afc..3528eebdad4549e5bd2cfacc08a5157d
          public static boolean logContainerCreationStacktraces = false;
          public static boolean disableHardThrow = false;
          public static boolean usePerWorldTpsBar = true;
-@@ -199,8 +199,8 @@ public class DivineConfig {
+@@ -204,8 +204,8 @@ public class DivineConfig {
  
          // Regionized chunk ticking
          @Experimental("Regionized Chunk Ticking")
@@ -30,23 +30,7 @@ index a95441732c887702eac011721f9f89334be87afc..3528eebdad4549e5bd2cfacc08a5157d
          public static int regionizedChunkTickingExecutorThreadPriority = Thread.NORM_PRIORITY + 2;
  
          // Async pathfinding settings
-@@ -260,10 +260,12 @@ public class DivineConfig {
-             regionizedChunkTickingExecutorThreadPriority = getInt(ConfigCategory.ASYNC.key("regionized-chunk-ticking.executor-thread-priority"), regionizedChunkTickingExecutorThreadPriority,
-                 "Configures the thread priority of the executor");
- 
--            if (regionizedChunkTickingExecutorThreadCount < 1 || regionizedChunkTickingExecutorThreadCount > 10) {
--                LOGGER.warn("Invalid regionized chunk ticking thread count: {}, resetting to default (4)", regionizedChunkTickingExecutorThreadCount);
--                regionizedChunkTickingExecutorThreadCount = 4;
-+            // BasiclandMC - optimize config start
-+            if (regionizedChunkTickingExecutorThreadCount < 1 || regionizedChunkTickingExecutorThreadCount > (Runtime.getRuntime().availableProcessors() / 2)) {
-+                LOGGER.warn("Invalid regionized chunk ticking thread count: {}, resetting to default (6)", regionizedChunkTickingExecutorThreadCount);
-+                regionizedChunkTickingExecutorThreadCount = 6;
-             }
-+            // BasiclandMC - end
-         }
- 
-         private static void asyncPathfinding() {
-@@ -381,7 +383,7 @@ public class DivineConfig {
+@@ -439,7 +439,7 @@ public class DivineConfig {
          public static int hopperThrottleSkipTicks = 0;
  
          // DAB settings
@@ -55,31 +39,7 @@ index a95441732c887702eac011721f9f89334be87afc..3528eebdad4549e5bd2cfacc08a5157d
          public static int dabStartDistance = 12;
          public static int dabStartDistanceSquared;
          public static int dabMaximumActivationFrequency = 20;
-@@ -395,14 +397,16 @@ public class DivineConfig {
-             "goat"
-         ));
- 
-+        // BasiclandMC optimize defaults start
-         // Virtual threads
--        public static boolean virtualThreadsEnabled = false;
--        public static boolean virtualBukkitScheduler = false;
--        public static boolean virtualChatScheduler = false;
--        public static boolean virtualTabCompleteScheduler = false;
--        public static boolean virtualAsyncExecutor = false;
--        public static boolean virtualCommandBuilderScheduler = false;
--        public static boolean virtualServerTextFilterPool = false;
-+        public static boolean virtualThreadsEnabled = true;
-+        public static boolean virtualBukkitScheduler = true;
-+        public static boolean virtualChatScheduler = true;
-+        public static boolean virtualTabCompleteScheduler = true;
-+        public static boolean virtualAsyncExecutor = true;
-+        public static boolean virtualCommandBuilderScheduler = true;
-+        public static boolean virtualServerTextFilterPool = true;
-+        // BasiclandMC optimize defaults end
- 
-         public static void load() {
-             chunkSettings();
-@@ -762,7 +766,7 @@ public class DivineConfig {
+@@ -777,7 +777,7 @@ public class DivineConfig {
          public static int playerProfileResultCachingTimeout = 1440;
  
          // No chat reports
@@ -88,7 +48,7 @@ index a95441732c887702eac011721f9f89334be87afc..3528eebdad4549e5bd2cfacc08a5157d
          public static boolean noChatReportsAddQueryData = true;
          public static boolean noChatReportsConvertToGameMessage = true;
          public static boolean noChatReportsDebugLog = false;
-@@ -770,12 +774,12 @@ public class DivineConfig {
+@@ -785,12 +785,12 @@ public class DivineConfig {
          public static String noChatReportsDisconnectDemandOnClientMessage = "You do not have No Chat Reports, and this server is configured to require it on client!";
  
          // Protocols
@@ -96,9 +56,8 @@ index a95441732c887702eac011721f9f89334be87afc..3528eebdad4549e5bd2cfacc08a5157d
 +        public static boolean protocolsAppleSkinEnabled = true; // BasiclandMC optimize defaults
          public static int protocolsAppleSkinSyncTickInterval = 20;
 -        public static boolean protocolsJadeEnabled = false;
--        public static boolean protocolsMapsXaeroMapEnabled = false;
 +        public static boolean protocolsJadeEnabled = true; // BasiclandMC optimize defaults
-+        public static boolean protocolsMapsXaeroMapEnabled = true; // BasiclandMC optimize defaults
+         public static boolean protocolsMapsXaeroMapEnabled = false;
          public static int protocolsMapsXaeroMapServerId = new Random().nextInt();
 -        public static boolean protocolsSyncMaticaEnabled = false;
 +        public static boolean protocolsSyncMaticaEnabled = true; // BasiclandMC optimize defaults
