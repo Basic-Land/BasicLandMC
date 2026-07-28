@@ -1,19 +1,13 @@
 --- a/divinemc-server/build.gradle.kts
 +++ b/divinemc-server/build.gradle.kts
-@@ -39,6 +_,7 @@
-     // DivineMC start - Rebrand
-     val divinemc = forks.register("divinemc") {
-         forks = purpur
-+        rootDirectory = upstreamsDirectory().map { it.dir("divinemc") }
-         upstream.patchRepo("paperServer") {
-             upstreamRepo = purpur.patchedRepo("paperServer")
-             patchesDir = rootDirectory.dir("divinemc-server/paper-patches")
-@@ -52,8 +_,35 @@
+@@ -52,10 +_,38 @@
+             outputDir = rootDirectory.dir("purpur-server")
          }
      }
- 
+-
 -    activeFork = divinemc
--    // DivineMC end - Rebrand
+     // DivineMC end - Rebrand
+ 
 +    // BasicLandMC start - Rebrand
 +    val basiclandmc = forks.register("basiclandmc") {
 +        forks = divinemc
@@ -43,10 +37,11 @@
 +
 +    activeFork = basiclandmc
 +    // BasicLandMC end - Rebrand
- 
-     spigot {
-         enabled = true
-@@ -147,6 +_,10 @@
++
+     /*updatingMinecraft { // Purpur start - TODO - snapshot - we don't need this
+         // oldPaperCommit = "d4fe85375af18bfa88f44d7c1e6a61904ae550cc"
+     }*/ // Purpur end - TODO - snapshot - we don't need this
+@@ -130,6 +_,10 @@
          java { srcDir("../purpur-server/src/main/java") }
          resources { srcDir("../purpur-server/src/main/resources") }
          // DivineMC end - Rebrand
@@ -57,7 +52,7 @@
      }
      test {
          java { srcDir("../paper-server/src/test/java") }
-@@ -155,6 +_,10 @@
+@@ -138,6 +_,10 @@
          java { srcDir("../purpur-server/src/test/java") }
          resources { srcDir("../purpur-server/src/test/resources") }
          // DivineMC end - Rebrand
@@ -68,18 +63,17 @@
      }
  }
  val log4jPlugins = sourceSets.create("log4jPlugins") {
-@@ -183,7 +_,8 @@
+@@ -166,7 +_,7 @@
  }
  
  dependencies {
 -    implementation(project(":divinemc-api")) // DivineMC - Rebrand
-+    implementation(project(":basiclandmc-api")) // BasicLandMC - Rebrand
-+    compileOnly("dev.cubxity.plugins", "unifiedmetrics-api", "0.3.8") // BasicLandMC - metrics implementation
++    implementation(project(":basiclandmc-api")) // DivineMC - Rebrand
  
      // DivineMC start - Dependencies
      implementation ("com.github.Carleslc.Simple-YAML:Simple-Yaml:1.8.4") {
-@@ -286,14 +_,14 @@
-         val experimental = rootProject.providers.gradleProperty("experimental").get() // DivineMC - Experimental flag
+@@ -260,14 +_,14 @@
+         val channel = rootProject.providers.gradleProperty("channel").get() // DivineMC - Channel
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",
 -            "Implementation-Title" to "DivineMC", // DivineMC - Rebrand

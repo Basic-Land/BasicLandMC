@@ -1,6 +1,6 @@
 --- a/divinemc-api/build.gradle.kts
 +++ b/divinemc-api/build.gradle.kts
-@@ -110,20 +_,24 @@
+@@ -111,20 +_,24 @@
              srcDir(generatedDir)
              srcDir(file("../paper-api/src/main/java"))
              srcDir(file("../purpur-api/src/main/java")) // DivineMC - Rebrand
