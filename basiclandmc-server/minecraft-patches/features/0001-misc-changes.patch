@@ -4,6 +4,18 @@ Date: Tue, 28 Jul 2026 15:37:53 +0200
 Subject: [PATCH] misc-changes
 
 
+diff --git a/net/minecraft/server/MinecraftServer.java b/net/minecraft/server/MinecraftServer.java
+index e2acd84041e2a34520ac3f83ce04099121ed60ea..cedb4b6c17e586b91cec965ebfbc733cc5d08bb3 100644
+--- a/net/minecraft/server/MinecraftServer.java
++++ b/net/minecraft/server/MinecraftServer.java
+@@ -673,6 +673,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+         ((org.bukkit.craftbukkit.help.SimpleHelpMap) this.server.getHelpMap()).initializeCommands();
+         this.server.getPluginManager().callEvent(new org.bukkit.event.server.ServerLoadEvent(org.bukkit.event.server.ServerLoadEvent.LoadType.STARTUP));
+         this.connection.acceptConnections();
++        cz.basicland.metrics.Metrics.init(LOGGER); //BasislandMC - init unified metrics
+     }
+     // Paper end - rework world loading process
+ 
 diff --git a/net/minecraft/server/commands/ForceLoadCommand.java b/net/minecraft/server/commands/ForceLoadCommand.java
 index 280fe9d389862098747006cf6f2c2f3292c8ad92..9c795f2af2c16b08d7ab734fd5c2dd9c63730e28 100644
 --- a/net/minecraft/server/commands/ForceLoadCommand.java
