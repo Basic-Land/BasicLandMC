@@ -1,39 +1,33 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: dan28000 <84990628+dan28000@users.noreply.github.com>
-Date: Sat, 14 Mar 2026 17:58:38 +0100
+Date: Tue, 28 Jul 2026 15:37:53 +0200
 Subject: [PATCH] misc-changes
 
 
 diff --git a/net/minecraft/server/commands/ForceLoadCommand.java b/net/minecraft/server/commands/ForceLoadCommand.java
-index 4dd9300c1fa38f59cae9526eb95926714d8a115a..c8d94ac88657511b81f5a63461e57d7ae00f607e 100644
+index 280fe9d389862098747006cf6f2c2f3292c8ad92..9c795f2af2c16b08d7ab734fd5c2dd9c63730e28 100644
 --- a/net/minecraft/server/commands/ForceLoadCommand.java
 +++ b/net/minecraft/server/commands/ForceLoadCommand.java
-@@ -158,8 +158,8 @@ public class ForceLoadCommand {
-             int sectionPosCoord2 = SectionPos.blockToSectionCoord(max);
-             int sectionPosCoord3 = SectionPos.blockToSectionCoord(max1);
-             long l = (sectionPosCoord2 - sectionPosCoord + 1L) * (sectionPosCoord3 - sectionPosCoord1 + 1L);
--            if (l > 256L) {
--                throw ERROR_TOO_MANY_CHUNKS.create(256, l);
-+            if (l > 2048L) {
-+                throw ERROR_TOO_MANY_CHUNKS.create(2048, l);
-             } else {
-                 ServerLevel level = source.getLevel();
-                 ResourceKey<Level> resourceKey = level.dimension();
+@@ -148,9 +148,10 @@ public class ForceLoadCommand {
+             int maxChunkX = SectionPos.blockToSectionCoord(maxX);
+             int maxChunkZ = SectionPos.blockToSectionCoord(maxZ);
+             long chunkCount = (maxChunkX - minChunkX + 1L) * (maxChunkZ - minChunkZ + 1L);
+-            if (chunkCount > 256L) {
+-                throw ERROR_TOO_MANY_CHUNKS.create(256, chunkCount);
+-            }
++            // BasiclnadMC misc changes - up the limit - start
++            if (chunkCount > 2048L) {
++                throw ERROR_TOO_MANY_CHUNKS.create(2048, chunkCount);
++            } // BasiclandMC - end
+ 
+             ServerLevel level = source.getLevel();
+             ResourceKey<Level> dimension = level.dimension();
 diff --git a/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-index c9d320a94b0928bbc7ee788328163619f1b4cd46..ddd5ecb4d1b2a4109a23c8973c50fc2fcf62f960 100644
+index 60c43c6b17e4888f78c735de993b47e86bdfcac4..3b2c438be40b10f700dc777bcfcd0e0a843fab82 100644
 --- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-@@ -2301,7 +2301,7 @@ public class ServerGamePacketListenerImpl
-     @Override
-     public void handleTeleportToEntityPacket(ServerboundTeleportToEntityPacket packet) {
-         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
--        if (this.player.isSpectator()) {
-+        if (this.player.isSpectator() && this.player.getBukkitEntity().hasPermission("spectatetp")) { // BasicLandMC - Add permission check for teleporting in spectator mode
-             for (ServerLevel serverLevel : this.server.getAllLevels()) {
-                 Entity entity = packet.getEntity(serverLevel);
-                 if (entity != null) {
-@@ -2704,7 +2704,8 @@ public class ServerGamePacketListenerImpl
-             // CraftBukkit end
+@@ -2734,7 +2734,8 @@ public class ServerGamePacketListenerImpl
+         // CraftBukkit end - replaced with thread safe throttle
              && !org.bxteam.divinemc.config.DivineConfig.NetworkCategory.disableDisconnectSpam // DivineMC - Option to disable disconnect.spam
              && !this.server.getPlayerList().isOp(this.player.nameAndId())
 -            && !this.server.isSingleplayerOwner(this.player.nameAndId())) {

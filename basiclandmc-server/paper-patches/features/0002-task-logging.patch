@@ -5,10 +5,10 @@ Subject: [PATCH] task-logging
 
 
 diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-index ad7189c40d6c69c785872c6860bd51d56e97935b..453f1699bd1d5083c0664c85aea49a18cfe72bd3 100644
+index a176c09d389600aeb3aa10eeb09d15c9ad80dedf..2583ef7be8c5b1ab9f1981278a4a21fa95808023 100644
 --- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 +++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-@@ -608,7 +608,9 @@ public final class CraftServer implements Server {
+@@ -602,7 +602,9 @@ public final class CraftServer implements Server {
  
          for (Plugin plugin : plugins) {
              if ((!plugin.isEnabled()) && (plugin.getDescription().getLoad() == type)) {

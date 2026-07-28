@@ -1,6 +1,6 @@
 --- a/assets/minecraft/lang/en_us.json
 +++ b/assets/minecraft/lang/en_us.json
-@@ -3473,6 +_,251 @@
+@@ -3562,6 +_,251 @@
    "enchantment.level.8": "VIII",
    "enchantment.level.9": "IX",
    "enchantment.level.10": "X",

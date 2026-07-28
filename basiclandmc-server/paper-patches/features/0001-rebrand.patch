@@ -1,24 +1,24 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: dan28000 <84990628+dan28000@users.noreply.github.com>
-Date: Sat, 14 Mar 2026 18:00:55 +0100
+Date: Tue, 28 Jul 2026 15:30:54 +0200
 Subject: [PATCH] rebrand
 
 
 diff --git a/src/main/java/com/destroystokyo/paper/console/PaperConsole.java b/src/main/java/com/destroystokyo/paper/console/PaperConsole.java
-index f5bc0eff886e9e3386467f40d4f329455d0b76e6..463c08978ad0ef92bb99bd9077dfcf92aa5b34bd 100644
+index c1580dc6c44bbd0d14f68baecba0ec2ce3f4aaad..966aa9115dcb2062cc8e21e57aa77df1e859e571 100644
 --- a/src/main/java/com/destroystokyo/paper/console/PaperConsole.java
 +++ b/src/main/java/com/destroystokyo/paper/console/PaperConsole.java
-@@ -20,7 +20,7 @@ public final class PaperConsole extends SimpleTerminalConsole {
+@@ -21,7 +21,7 @@ public final class PaperConsole extends SimpleTerminalConsole {
      @Override
      protected LineReader buildReader(LineReaderBuilder builder) {
          builder
 -                .appName("DivineMC") // DivineMC - Rebrand
 +                .appName("BasiclandMC") // BasicLandMC - Rebrand
-                 .variable(LineReader.HISTORY_FILE, ((java.io.File) server.options.valueOf("console-history")).toPath()) // DivineMC - make configurable location of files
+                 .variable(LineReader.HISTORY_FILE, historyFile(this.server)) // DivineMC - make configurable location of files
                  .completer(new ConsoleCommandCompleter(this.server))
                  .option(LineReader.Option.COMPLETE_IN_WORD, true);
 diff --git a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
-index 4d3518795a238d87ca4f3df0bee074ab5bcc2734..e8f0ef936ca658e6e2a76d52fb9f81efcd488544 100644
+index c0c294d5e4e28d944787a572ec16cfdb8623fc75..c92c6dbb68de390f7417ff1f7d9378c82a324568 100644
 --- a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
 +++ b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
 @@ -35,6 +35,7 @@ public record ServerBuildInfoImpl(
