@@ -5,14 +5,18 @@ Subject: [PATCH] misc-changes
 
 
 diff --git a/net/minecraft/server/MinecraftServer.java b/net/minecraft/server/MinecraftServer.java
-index e2acd84041e2a34520ac3f83ce04099121ed60ea..cedb4b6c17e586b91cec965ebfbc733cc5d08bb3 100644
+index e2acd84041e2a34520ac3f83ce04099121ed60ea..2452fc497cee4dc670c755922dd2f60c5309d655 100644
 --- a/net/minecraft/server/MinecraftServer.java
 +++ b/net/minecraft/server/MinecraftServer.java
-@@ -673,6 +673,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+@@ -673,6 +673,11 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
          ((org.bukkit.craftbukkit.help.SimpleHelpMap) this.server.getHelpMap()).initializeCommands();
          this.server.getPluginManager().callEvent(new org.bukkit.event.server.ServerLoadEvent(org.bukkit.event.server.ServerLoadEvent.LoadType.STARTUP));
          this.connection.acceptConnections();
-+        cz.basicland.metrics.Metrics.init(LOGGER); //BasislandMC - init unified metrics
++        // BasiclandMC - start - metrics
++        if (server.getPluginManager().isPluginEnabled("UnifiedMetrics") && Boolean.parseBoolean(System.getProperty("BL.metrics", "true"))) {
++            cz.basicland.metrics.Metrics.init(LOGGER);
++        }
++        // BasiclandMC - end - metrics
      }
      // Paper end - rework world loading process
  
