@@ -26,7 +26,7 @@ pipeline {
 		stage('basiclandmc-server:createPaperclipJar') {
 			steps {
 				script {
-					runGradleTask('basiclandmc-server:createPaperclipJar')
+					runGradleTask('basiclandmc-server:createMojmapPaperclipJar')
 				}
 			}
 		}
