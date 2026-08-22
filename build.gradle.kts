@@ -107,6 +107,14 @@ subprojects {
                 isAllowInsecureProtocol = true
                 credentials(PasswordCredentials::class)
             }
+            maven("http://192.168.1.103:30451/repository/dev-snapshots/") {
+                name = "local"
+                isAllowInsecureProtocol = true
+                credentials {
+                    username = "${System.getenv("NEXUS_USERNAME")}"
+                    password = "${System.getenv("NEXUS_PASSWORD")}"
+                }
+            }
         }
     }
 }
