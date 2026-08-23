@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Sun, 23 Aug 2026 10:59:21 +0200
+Subject: [PATCH] mace-event
+
+
+diff --git a/net/minecraft/world/item/MaceItem.java b/net/minecraft/world/item/MaceItem.java
+index 681ef7b4f6f987b1779859ed1d9bcd6e5670adab..fa0f499116093d77863cd75a455af570e4f8b1bd 100644
+--- a/net/minecraft/world/item/MaceItem.java
++++ b/net/minecraft/world/item/MaceItem.java
+@@ -115,9 +115,15 @@ public class MaceItem extends Item {
+                 damage = 22.0 + fallDistance - 8.0;
+             }
+ 
+-            return attacker.level() instanceof ServerLevel level
+-                ? (float)(damage + EnchantmentHelper.modifyFallBasedDamage(level, attacker.getWeaponItem(), victim, damageSource, 0.0F) * fallDistance)
+-                : (float)damage;
++            if (attacker.level() instanceof ServerLevel level) {
++                double extra = EnchantmentHelper.modifyFallBasedDamage(level, attacker.getWeaponItem(), victim, damageSource, 0.0F) * fallDistance;
++                float sum = (float) (damage + extra);
++                if (attacker instanceof ServerPlayer player && sum > 0) new cz.basicland.stattrack.MacePlungeEvent(player.getBukkitEntity(),
++                    attacker.getWeaponItem().asBukkitMirror(), damage, extra, fallDistance).callEvent(); // BasicLand - Add DensityDmg event
++                return sum;
++            } else {
++                return (float)damage;
++            }
+         } else {
+             return 0.0F;
+         }

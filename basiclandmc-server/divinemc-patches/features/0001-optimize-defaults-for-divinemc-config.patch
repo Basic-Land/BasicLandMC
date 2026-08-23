@@ -5,7 +5,7 @@ Subject: [PATCH] optimize-defaults-for-divinemc-config
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index 6bb155e55a18f08a870e4bd3d68958e367b89d88..15ea31fdd7dd2cc33eaf7296f5574c37ea96eb3a 100644
+index ca1dc923cf7a9625101e130514cfb6513d7a34f1..7a74eba69ad4590fc2e9025ed076f456d0a7ae41 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 @@ -240,7 +240,7 @@ public class DivineConfig {
@@ -28,7 +28,7 @@ index 6bb155e55a18f08a870e4bd3d68958e367b89d88..15ea31fdd7dd2cc33eaf7296f5574c37
          public static int regionizedChunkTickingExecutorThreadPriority = Thread.NORM_PRIORITY + 2;
  
          // Async pathfinding settings
-@@ -536,7 +536,7 @@ public class DivineConfig {
+@@ -535,7 +535,7 @@ public class DivineConfig {
          public static int hopperThrottleSkipTicks = 0;
  
          // DAB settings
@@ -37,7 +37,7 @@ index 6bb155e55a18f08a870e4bd3d68958e367b89d88..15ea31fdd7dd2cc33eaf7296f5574c37
          public static int dabStartDistance = 12;
          public static int dabStartDistanceSquared;
          public static int dabMaximumActivationFrequency = 20;
-@@ -890,7 +890,7 @@ public class DivineConfig {
+@@ -887,7 +887,7 @@ public class DivineConfig {
          public static int playerProfileResultCachingTimeout = 1440;
  
          // No chat reports
@@ -46,7 +46,7 @@ index 6bb155e55a18f08a870e4bd3d68958e367b89d88..15ea31fdd7dd2cc33eaf7296f5574c37
          public static boolean noChatReportsAddQueryData = true;
          public static boolean noChatReportsConvertToGameMessage = true;
          public static boolean noChatReportsDebugLog = false;
-@@ -899,12 +899,12 @@ public class DivineConfig {
+@@ -896,12 +896,12 @@ public class DivineConfig {
  
          // Protocols
          public static boolean protocolsStrictMode = false;

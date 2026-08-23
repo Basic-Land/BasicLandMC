@@ -5,7 +5,7 @@ Subject: [PATCH] misc-changes
 
 
 diff --git a/net/minecraft/server/MinecraftServer.java b/net/minecraft/server/MinecraftServer.java
-index e2acd84041e2a34520ac3f83ce04099121ed60ea..2452fc497cee4dc670c755922dd2f60c5309d655 100644
+index cbce12c25237ea1c81b92496caf61f089d9c226b..e6c89ca769db5818da0ce70dd965ad7ad883b5f6 100644
 --- a/net/minecraft/server/MinecraftServer.java
 +++ b/net/minecraft/server/MinecraftServer.java
 @@ -673,6 +673,11 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
@@ -39,10 +39,10 @@ index 280fe9d389862098747006cf6f2c2f3292c8ad92..9c795f2af2c16b08d7ab734fd5c2dd9c
              ServerLevel level = source.getLevel();
              ResourceKey<Level> dimension = level.dimension();
 diff --git a/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-index 60c43c6b17e4888f78c735de993b47e86bdfcac4..3b2c438be40b10f700dc777bcfcd0e0a843fab82 100644
+index 4e8a85205d5d2e067142d1b1b01b490377f0cdae..df5704f86573194794d99e8a350b0d39c909b544 100644
 --- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-@@ -2734,7 +2734,8 @@ public class ServerGamePacketListenerImpl
+@@ -2735,7 +2735,8 @@ public class ServerGamePacketListenerImpl
          // CraftBukkit end - replaced with thread safe throttle
              && !org.bxteam.divinemc.config.DivineConfig.NetworkCategory.disableDisconnectSpam // DivineMC - Option to disable disconnect.spam
              && !this.server.getPlayerList().isOp(this.player.nameAndId())
