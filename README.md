@@ -1,45 +1,43 @@
-<img src="/public/logo.png" height="220" alt="DivineMC Face" align="right">
 <div align="center">
 
 # DivineMC
+DivineMC is a multi-functional fork of [Purpur](https://github.com/PurpurMC/Purpur), which focuses on the flexibility of your server and its optimization
 
-[![Github Releases](https://img.shields.io/badge/Download-Releases-blue?&style=for-the-badge)](https://github.com/BX-Team/DivineMC/releases)
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/BX-Team/DivineMC/build.yml?logo=GoogleAnalytics&logoColor=ffffff&style=for-the-badge)](https://github.com/BX-Team/DivineMC/actions)
-[![Discord](https://img.shields.io/discord/931595732752953375?color=5865F2&label=discord&style=for-the-badge)](https://discord.gg/p7cxhw7E2M)
+[![website](https://raw.githubusercontent.com/NONPLAYT/badges/refs/heads/master/available-on-our-website.svg)](https://bxteam.org/downloads/divinemc)
+[![mcjars](https://raw.githubusercontent.com/NONPLAYT/badges/refs/heads/master/available-on-mcjars.svg)](https://mcjars.app/DIVINEMC/versions)
 
-DivineMC is a high-performance [Purpur](https://github.com/PurpurMC/Purpur) fork focused on maximizing server performance while maintaining plugin compatibility.
-
+[![Chat on Discord](https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/cozy/social/discord-plural_vector.svg)](https://discord.gg/qNyybSSPm5)
+[![Read the Docs](https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/cozy/documentation/generic_vector.svg)](https://bxteam.org/docs/divinemc)
+[![Available on BStats](https://raw.githubusercontent.com/NONPLAYT/badges/refs/heads/master/available-on-bstats.svg)](https://bstats.org/plugin/server-implementation/DivineMC)
 </div>
 
-> [!WARNING]  
-> DivineMC is a performance-oriented fork. Make sure to take backups **before** switching to it. We also welcome a new contributor to help us improve the fork.
-
 ## ⚙️ Features
-- **Based on [Purpur](https://github.com/PurpurMC/Purpur)** that adds a high customization level to the server.
-- Implemented **Parallel world ticking** feature, that allows to server take advantage of multiple CPU cores to tick worlds.
-- Implemented **Secure Seed** mod that changes default 64-bit seed to a 1024-bit seed, making it almost impossible to crack the seed.
-- **Optimized chunk generation** that can generate chunks up to 70% faster than vanilla.
-- **Async** pathfinding, entity tracker, mob spawning and chunk sending.
-- Implemented **Linear region file format**
-- **Fully compatible** with Bukkit, Spigot and Paper plugins
-- **Fixes** some Minecraft bugs
-- Integrated with [Sentry](https://sentry.io/welcome/) to easy track all errors coming from your server in excruciating detail (original by [Pufferfish](https://github.com/pufferfish-gg/Pufferfish))
-- and more...
+- **Based on [Purpur](https://github.com/PurpurMC/Purpur)** - Adds a high customization level to your server
+- **Regionized Chunk Ticking** - Tick chunks in parallel, similar to how Folia does it
+- **Parallel World Ticking** - Leverage multiple CPU cores for world processing
+- **Parallel Sensor Phase** - Run the expensive read-only part of mob AI (entity scans, line-of-sight checks) on a thread pool
+- **Async Operations** - Pathfinding, entity tracker, mob spawning, joining, chunk sending and portal pre-loading
+- **Raytrace Entity Culling** - Stops sending entities a player provably cannot see, saving bandwidth and blinding entity-ESP cheats
+- **Secure Seed** - Enhanced 1024-bit seed system (vs standard 64-bit) for maximum security
+- **Linear Region File Format** - Optimize your world with the old V1/V2 linear format and the new Buffered format
+- **Mod Protocols Support** - Compatible with Syncmatica, Apple Skin, Jade and Xaero's Map
+- **Fully Compatible** - Works seamlessly with Bukkit, Spigot and Paper plugins
+- **Bug Fixes** - Resolves various Minecraft issues (~10)
+- **Sentry Integration** - Detailed error tracking and monitoring (original by [Pufferfish](https://github.com/pufferfish-gg/Pufferfish))
+
+*...and much more!*
 
 ## 📥 Downloading & Installing
 If you want to install DivineMC, you can read our [installation documentation](https://bxteam.org/docs/divinemc/getting-started/installation).
 
-You can find the latest successful build in [Releases](https://github.com/BX-Team/DivineMC/releases) or you can use [MCJars](https://mcjars.app/DIVINEMC/versions) website.
-
-## 📈 bStats
-[![bStats](https://bstats.org/signatures/server-implementation/DivineMC.svg)](https://bstats.org/plugin/server-implementation/DivineMC)
+You can find the latest successful builds on our [website](https://bxteam.org/downloads/divinemc) or on [MCJars](https://mcjars.app/DIVINEMC/versions).
 
 ## 📦 Building and setting up
 Run the following commands in the root directory:
 
 ```bash
-> ./gradlew applyAllPatches              # apply all patches
-> ./gradlew createMojmapPaperclipJar     # build the server jar
+> ./gradlew applyAllPatches        # apply all patches
+> ./gradlew createPaperclipJar     # build the server jar
 ```
 
 For anything else you can refer to our [contribution guide](https://bxteam.org/docs/divinemc/development/contributing).
@@ -57,7 +55,7 @@ For anything else you can refer to our [contribution guide](https://bxteam.org/d
 <dependency>
   <groupId>org.bxteam.divinemc</groupId>
   <artifactId>divinemc-api</artifactId>
-  <version>1.21.4-R0.1-SNAPSHOT</version>
+  <version>[26.2.build,)</version>
   <scope>provided</scope>
 </dependency>
 ```
@@ -70,31 +68,26 @@ repositories {
 ```
 ```kotlin
 dependencies {
-    compileOnly("org.bxteam.divinemc:divinemc-api:1.21.4-R0.1-SNAPSHOT")
+    compileOnly("org.bxteam.divinemc:divinemc-api:26.2.build.+")
 }
 ```
-
-We also have a [Javadoc](https://repo.bxteam.org/javadoc/snapshots/org/bxteam/divinemc/divinemc-api/1.21.4-R0.1-SNAPSHOT/raw/index.html) for the API.
 
 ## ⚖️ License
 DivineMC is licensed under the GNU General Public License v3.0. You can find the license [here](LICENSE).
 
 ## 📜 Credits
-DivineMC includes patches from other forks, and without these forks, DivineMC wouldn't exist today. Here are the list of these forks:
+DivineMC includes patches from other projects, and without these projects, DivineMC wouldn't exist today. Here is a small list of projects that DivineMC takes patches from:
 
 - [Purpur](https://github.com/PurpurMC/Purpur)
-- <details>
-    <summary>📜 Expand to see forks that DivineMC takes patches from.</summary>
-    <p>
-      • <a href="https://github.com/Bloom-host/Petal">Petal</a><br>
-      • <a href="https://github.com/fxmorin/carpet-fixes">Carpet Fixes</a><br>
-      • <a href="https://github.com/ProjectEdenGG/Parchment">Parchment</a><br>
-      • <a href="https://github.com/LeavesMC/Leaves">Leaves</a><br>
-      • <a href="https://github.com/KaiijuMC/Kaiiju">Kaiiju</a><br>
-      • <a href="https://github.com/SparklyPower/SparklyPaper">SparklyPaper</a><br>
-      • <a href="https://github.com/plasmoapp/matter">Matter</a><br>
-      • <a href="https://github.com/CraftCanvasMC/Canvas">Canvas</a><br>
-    </p>
-</details>
+- [Petal](https://github.com/Bloom-host/Petal)
+- [Parchment](https://github.com/ProjectEdenGG/Parchment)
+- [Leaves](https://github.com/LeavesMC/Leaves)
+- [SparklyPaper](https://github.com/SparklyPower/SparklyPaper)
+- [matter](https://github.com/plasmoapp/matter)
+- [C2ME](https://github.com/RelativityMC/C2ME-fabric)
+- [VMP](https://github.com/RelativityMC/VMP-fabric)
+- [EntityCulling](https://github.com/tr7zw/EntityCulling)
+- [carpet-fixes](https://github.com/fxmorin/carpet-fixes)
+- ... and others
 
 If you want to know more about other forks and see other Minecraft projects, you can go to our [list of different Minecraft server Software](https://gist.github.com/NONPLAYT/48742353af8ae36bcef5d1c36de9730a).

@@ -1,13 +1,21 @@
 --- a/divinemc-server/build.gradle.kts
 +++ b/divinemc-server/build.gradle.kts
-@@ -52,10 +_,38 @@
-             outputDir = rootDirectory.dir("purpur-server")
+@@ -1,9 +_,6 @@
+-import io.papermc.fill.model.BuildChannel
+ import io.papermc.paperweight.attribute.DevBundleOutput
+ import io.papermc.paperweight.util.*
+ import java.time.Instant
+-import kotlin.io.path.createParentDirectories
+-import kotlin.io.path.writeText
+ 
+ plugins {
+     `java-library`
+@@ -53,8 +_,36 @@
          }
      }
--
+ 
 -    activeFork = divinemc
      // DivineMC end - Rebrand
- 
 +    // BasicLandMC start - Rebrand
 +    val basiclandmc = forks.register("basiclandmc") {
 +        forks = divinemc
@@ -37,10 +45,9 @@
 +
 +    activeFork = basiclandmc
 +    // BasicLandMC end - Rebrand
-+
+ 
      /*updatingMinecraft { // Purpur start - TODO - snapshot - we don't need this
          // oldPaperCommit = "d4fe85375af18bfa88f44d7c1e6a61904ae550cc"
-     }*/ // Purpur end - TODO - snapshot - we don't need this
 @@ -130,6 +_,10 @@
          java { srcDir("../purpur-server/src/main/java") }
          resources { srcDir("../purpur-server/src/main/resources") }
@@ -63,7 +70,7 @@
      }
  }
  val log4jPlugins = sourceSets.create("log4jPlugins") {
-@@ -166,7 +_,8 @@
+@@ -166,11 +_,12 @@
  }
  
  dependencies {
@@ -72,8 +79,14 @@
 +    compileOnly("dev.cubxity.plugins", "unifiedmetrics-api", "0.3.8") // BasicLandMC - metrics implementation
  
      // DivineMC start - Dependencies
-     implementation ("com.github.Carleslc.Simple-YAML:Simple-Yaml:1.8.4") {
-@@ -260,14 +_,14 @@
+-    implementation ("com.github.Carleslc.Simple-YAML:Simple-Yaml:1.8.5") {
+-        exclude(group="org.yaml", module="snakeyaml")
++    implementation("com.github.Carleslc.Simple-YAML:Simple-Yaml:1.8.5") {
++        exclude(group = "org.yaml", module = "snakeyaml")
+     }
+     implementation("com.github.luben:zstd-jni:1.5.7-12")
+     implementation("at.yawk.lz4:lz4-java:1.11.2")
+@@ -259,14 +_,14 @@
          val channel = rootProject.providers.gradleProperty("channel").get() // DivineMC - Channel
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",
