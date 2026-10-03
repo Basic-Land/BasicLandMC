@@ -18,6 +18,7 @@ pipeline {
 		stage('applyAllPatches') {
 			steps {
 				script {
+		            runGradleTask('clean')
 					runGradleTask('applyAllPatches')
 				}
 			}
