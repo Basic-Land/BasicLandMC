@@ -15,10 +15,17 @@ pipeline {
 	}
 
 	stages {
+	    stage('rebuildAllServerPatches') {
+			steps {
+				script {
+					runGradleTask('rebuildAllServerPatches')
+				}
+			}
+	    }
+
 		stage('applyAllPatches') {
 			steps {
 				script {
-		            runGradleTask('clean')
 					runGradleTask('applyAllPatches')
 				}
 			}
