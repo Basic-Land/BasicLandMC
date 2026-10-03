@@ -5,10 +5,10 @@ Subject: [PATCH] misc-changes
 
 
 diff --git a/net/minecraft/server/MinecraftServer.java b/net/minecraft/server/MinecraftServer.java
-index cbce12c25237ea1c81b92496caf61f089d9c226b..e6c89ca769db5818da0ce70dd965ad7ad883b5f6 100644
+index 55d6595b0bbcf752dba3a4b61dc3f953180e5565..c322a1e7693935e4ae04bc9bed11d23a7e83f490 100644
 --- a/net/minecraft/server/MinecraftServer.java
 +++ b/net/minecraft/server/MinecraftServer.java
-@@ -673,6 +673,11 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+@@ -675,6 +675,11 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
          ((org.bukkit.craftbukkit.help.SimpleHelpMap) this.server.getHelpMap()).initializeCommands();
          this.server.getPluginManager().callEvent(new org.bukkit.event.server.ServerLoadEvent(org.bukkit.event.server.ServerLoadEvent.LoadType.STARTUP));
          this.connection.acceptConnections();

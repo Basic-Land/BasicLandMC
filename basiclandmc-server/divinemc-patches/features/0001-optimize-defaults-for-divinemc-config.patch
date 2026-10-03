@@ -5,7 +5,7 @@ Subject: [PATCH] optimize-defaults-for-divinemc-config
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index ca1dc923cf7a9625101e130514cfb6513d7a34f1..7a74eba69ad4590fc2e9025ed076f456d0a7ae41 100644
+index 817b907cf3fa5e7ef28137775f247c6aa419f60a..58770e748e9d322a4c646f06f9c2ce40a6668492 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 @@ -240,7 +240,7 @@ public class DivineConfig {
@@ -37,7 +37,7 @@ index ca1dc923cf7a9625101e130514cfb6513d7a34f1..7a74eba69ad4590fc2e9025ed076f456
          public static int dabStartDistance = 12;
          public static int dabStartDistanceSquared;
          public static int dabMaximumActivationFrequency = 20;
-@@ -887,7 +887,7 @@ public class DivineConfig {
+@@ -891,7 +891,7 @@ public class DivineConfig {
          public static int playerProfileResultCachingTimeout = 1440;
  
          // No chat reports
@@ -46,7 +46,7 @@ index ca1dc923cf7a9625101e130514cfb6513d7a34f1..7a74eba69ad4590fc2e9025ed076f456
          public static boolean noChatReportsAddQueryData = true;
          public static boolean noChatReportsConvertToGameMessage = true;
          public static boolean noChatReportsDebugLog = false;
-@@ -896,12 +896,12 @@ public class DivineConfig {
+@@ -900,12 +900,12 @@ public class DivineConfig {
  
          // Protocols
          public static boolean protocolsStrictMode = false;

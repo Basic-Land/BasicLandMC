@@ -59,10 +59,10 @@
      }
      test {
          java { srcDir("../paper-server/src/test/java") }
-@@ -138,6 +_,10 @@
-         java { srcDir("../purpur-server/src/test/java") }
+@@ -139,6 +_,10 @@
          resources { srcDir("../purpur-server/src/test/resources") }
          // DivineMC end - Rebrand
+         java { srcDir("src/test/java") } // DivineMC - Include own tests dir
 +        // BasicLandMC start - Rebrand
 +        java { srcDir("../divinemc-server/src/test/java") }
 +        resources { srcDir("../divinemc-server/src/test/resources") }
@@ -70,7 +70,7 @@
      }
  }
  val log4jPlugins = sourceSets.create("log4jPlugins") {
-@@ -166,11 +_,12 @@
+@@ -167,11 +_,12 @@
  }
  
  dependencies {
@@ -86,7 +86,7 @@
      }
      implementation("com.github.luben:zstd-jni:1.5.7-12")
      implementation("at.yawk.lz4:lz4-java:1.11.2")
-@@ -259,14 +_,14 @@
+@@ -260,14 +_,14 @@
          val channel = rootProject.providers.gradleProperty("channel").get() // DivineMC - Channel
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",
