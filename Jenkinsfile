@@ -7,6 +7,15 @@ def runGradleTask(String task) {
 	}
 }
 
+def retryWithCleanWorkspace(int retries, Closure body) {
+	retry(retries) {
+		if (currentBuild.getPreviousBuild() != null) {
+			cleanWs()
+		}
+		body()
+	}
+}
+
 pipeline {
 	agent any
 
@@ -15,18 +24,13 @@ pipeline {
 	}
 
 	stages {
-	    stage('rebuildAllServerPatches') {
+		stage('rebuildAllServerPatches') {
 			steps {
 				script {
-					runGradleTask('rebuildAllServerPatches')
-				}
-			}
-	    }
-
-		stage('applyAllPatches') {
-			steps {
-				script {
-					runGradleTask('applyAllPatches')
+					retryWithCleanWorkspace(2) {
+						runGradleTask('rebuildAllServerPatches')
+						runGradleTask('applyAllPatches')
+					}
 				}
 			}
 		}
@@ -54,4 +58,3 @@ pipeline {
 		}
 	}
 }
-
