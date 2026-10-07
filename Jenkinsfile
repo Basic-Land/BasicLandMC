@@ -7,15 +7,6 @@ def runGradleTask(String task) {
 	}
 }
 
-def retryWithCleanWorkspace(int retries, Closure body) {
-	retry(retries) {
-		if (currentBuild.getPreviousBuild() != null) {
-			cleanWs()
-		}
-		body()
-	}
-}
-
 pipeline {
 	agent any
 
@@ -24,32 +15,16 @@ pipeline {
 	}
 
 	stages {
-		stage('rebuildAllServerPatches') {
+	    stage('rebuildAllServerPatches') {
 			steps {
 				script {
-					retryWithCleanWorkspace(2) {
-						runGradleTask('rebuildAllServerPatches')
-						runGradleTask('applyAllPatches')
-					}
-				}
-			}
-		}
-
-		stage('basiclandmc-server:createPaperclipJar') {
-			steps {
-				script {
+					runGradleTask('rebuildAllServerPatches')
+					runGradleTask('applyAllPatches')
 					runGradleTask('basiclandmc-server:createPaperclipJar')
-				}
-			}
-		}
-
-		stage('publishAllPublicationsToLocalRepository') {
-			steps {
-				script {
 					runGradleTask('publishAllPublicationsToLocalRepository')
 				}
 			}
-		}
+	    }
 	}
 
 	post {
