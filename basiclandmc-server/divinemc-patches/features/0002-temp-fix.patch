@@ -1,0 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Thu, 8 Oct 2026 01:34:10 +0200
+Subject: [PATCH] temp-fix
+
+
+diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
+index d30630d125b15e7ae81256c9a726bdb2a9ff67dc..95812c324ebdaba866f76407eda549b676c4eb27 100644
+--- a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
++++ b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
+@@ -106,7 +106,7 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+         final SavedDataStorage savedDataStorage
+     ) {
+         super(level, levelStorageAccess, fixerUpper, structureTemplateManager, executor, generator, viewDistance, simulationDistance, sync, chunkStatusListener, overworldDataStorage, savedDataStorage);
+-        this.avgTimeLogger = new AvgTimeLogger(level.serverLevelData.getLevelName());
++        this.avgTimeLogger = new AvgTimeLogger(level.bukkitName);
+         for (int color = 0; color < COLORS; color++) {
+             this.tilesByColor[color] = new ObjectArrayList<>();
+         }
