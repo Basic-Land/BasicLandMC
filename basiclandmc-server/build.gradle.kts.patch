@@ -70,13 +70,12 @@
      }
  }
  val log4jPlugins = sourceSets.create("log4jPlugins") {
-@@ -167,11 +_,12 @@
+@@ -167,11 +_,11 @@
  }
  
  dependencies {
 -    implementation(project(":divinemc-api")) // DivineMC - Rebrand
 +    implementation(project(":basiclandmc-api")) // DivineMC - Rebrand
-+    compileOnly("dev.cubxity.plugins", "unifiedmetrics-api", "0.3.8") // BasicLandMC - metrics implementation
  
      // DivineMC start - Dependencies
 -    implementation ("com.github.Carleslc.Simple-YAML:Simple-Yaml:1.8.5") {
