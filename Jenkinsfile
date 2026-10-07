@@ -15,10 +15,9 @@ pipeline {
 	}
 
 	stages {
-	    stage('rebuildAllServerPatches') {
+	    stage('build') {
 			steps {
 				script {
-					runGradleTask('rebuildAllServerPatches')
 					runGradleTask('applyAllPatches')
 					runGradleTask('basiclandmc-server:createPaperclipJar')
 					runGradleTask('publishAllPublicationsToLocalRepository')
