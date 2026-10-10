@@ -1,0 +1,471 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Thu, 8 Oct 2026 12:52:24 +0200
+Subject: [PATCH] thread-affinity
+
+
+diff --git a/src/main/java/org/bxteam/divinemc/async/AsyncChunkSend.java b/src/main/java/org/bxteam/divinemc/async/AsyncChunkSend.java
+index 87748e21e9342c2b50df50b46a3397acddd04f91..4c51a8996b163dccfc146b7aac18756c3cd1b58f 100644
+--- a/src/main/java/org/bxteam/divinemc/async/AsyncChunkSend.java
++++ b/src/main/java/org/bxteam/divinemc/async/AsyncChunkSend.java
+@@ -1,12 +1,13 @@
+ package org.bxteam.divinemc.async;
+ 
+-import org.bxteam.divinemc.config.DivineConfig;
+-import org.bxteam.divinemc.util.NamedAgnosticThreadFactory;
+-
+ import java.util.concurrent.ExecutorService;
+ import java.util.concurrent.LinkedBlockingQueue;
+ import java.util.concurrent.ThreadPoolExecutor;
+ import java.util.concurrent.TimeUnit;
++import org.bxteam.divinemc.config.DivineConfig;
++import org.bxteam.divinemc.util.NamedAgnosticThreadFactoryAffinity;
++
++import static org.bxteam.divinemc.config.DivineConfig.GuruMode.asyncChunkSendingAffinity;
+ 
+ public class AsyncChunkSend {
+     public static final ExecutorService POOL = DivineConfig.AsyncCategory.asyncChunkSendingEnabled ? newPool() : null;
+@@ -16,7 +17,9 @@ public class AsyncChunkSend {
+             DivineConfig.AsyncCategory.asyncChunkSendingMaxThreads, DivineConfig.AsyncCategory.asyncChunkSendingMaxThreads,
+             30L, TimeUnit.SECONDS,
+             new LinkedBlockingQueue<>(),
+-            new NamedAgnosticThreadFactory<>("Async Chunk Sending", AsyncChunkSendThread::new, Thread.NORM_PRIORITY),
++            new NamedAgnosticThreadFactoryAffinity<>("Async Chunk Sending", AsyncChunkSendThread::new,
++                Thread.NORM_PRIORITY, asyncChunkSendingAffinity
++            ),
+             new ThreadPoolExecutor.CallerRunsPolicy()
+         );
+         pool.allowCoreThreadTimeOut(true);
+diff --git a/src/main/java/org/bxteam/divinemc/async/pathfinding/AsyncPath.java b/src/main/java/org/bxteam/divinemc/async/pathfinding/AsyncPath.java
+index 19232b85c41fe5d588461f4639fefa955aea92d2..a736e0f1ea564458e2fdb20000be3f5e672474eb 100644
+--- a/src/main/java/org/bxteam/divinemc/async/pathfinding/AsyncPath.java
++++ b/src/main/java/org/bxteam/divinemc/async/pathfinding/AsyncPath.java
+@@ -1,6 +1,18 @@
+ package org.bxteam.divinemc.async.pathfinding;
+ 
+ import ca.spottedleaf.moonrise.common.util.TickThread;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Objects;
++import java.util.Set;
++import java.util.concurrent.CompletableFuture;
++import java.util.concurrent.LinkedBlockingQueue;
++import java.util.concurrent.RejectedExecutionHandler;
++import java.util.concurrent.ThreadPoolExecutor;
++import java.util.concurrent.TimeUnit;
++import java.util.concurrent.TimeoutException;
++import java.util.function.Consumer;
++import java.util.function.Function;
+ import net.minecraft.core.BlockPos;
+ import net.minecraft.server.MinecraftServer;
+ import net.minecraft.world.entity.Entity;
+@@ -11,17 +23,11 @@ import net.minecraft.world.phys.Vec3;
+ import org.apache.logging.log4j.LogManager;
+ import org.apache.logging.log4j.Logger;
+ import org.bxteam.divinemc.config.DivineConfig;
+-import org.bxteam.divinemc.util.NamedAgnosticThreadFactory;
++import org.bxteam.divinemc.util.NamedAgnosticThreadFactoryAffinity;
+ import org.jetbrains.annotations.NotNull;
+ import org.jetbrains.annotations.Nullable;
+ 
+-import java.util.ArrayList;
+-import java.util.List;
+-import java.util.Objects;
+-import java.util.Set;
+-import java.util.concurrent.*;
+-import java.util.function.Consumer;
+-import java.util.function.Function;
++import static org.bxteam.divinemc.config.DivineConfig.GuruMode.asyncPathfindingAffinity;
+ 
+ @SuppressWarnings("NullableProblems")
+ public final class AsyncPath extends Path {
+@@ -308,10 +314,11 @@ public final class AsyncPath extends Path {
+             DivineConfig.AsyncCategory.asyncPathfindingMaxThreads,
+             DivineConfig.AsyncCategory.asyncPathfindingKeepalive, TimeUnit.SECONDS,
+             new LinkedBlockingQueue<>(DivineConfig.AsyncCategory.asyncPathfindingQueueSize),
+-            new NamedAgnosticThreadFactory<>(
++            new NamedAgnosticThreadFactoryAffinity<>(
+                 THREAD_PREFIX,
+                 TickThread::new,
+-                Thread.NORM_PRIORITY - 2
++                Thread.NORM_PRIORITY - 2,
++                asyncPathfindingAffinity
+             ),
+             new RejectionHandler()
+         );
+diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
+index 95812c324ebdaba866f76407eda549b676c4eb27..7661a8ae30352a51d65d5896c68b3b4bc9c884e0 100644
+--- a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
++++ b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
+@@ -11,6 +11,15 @@ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+ import it.unimi.dsi.fastutil.objects.ObjectIterator;
++import java.io.IOException;
++import java.util.Arrays;
++import java.util.List;
++import java.util.concurrent.CompletableFuture;
++import java.util.concurrent.ConcurrentHashMap;
++import java.util.concurrent.Executor;
++import java.util.concurrent.Executors;
++import java.util.concurrent.atomic.AtomicInteger;
++import java.util.function.Supplier;
+ import net.minecraft.server.level.ServerChunkCache;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.server.level.ServerPlayer;
+@@ -23,23 +32,17 @@ import net.minecraft.world.level.gamerules.GameRules;
+ import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+ import net.minecraft.world.level.storage.LevelStorageSource;
+ import net.minecraft.world.level.storage.SavedDataStorage;
+-import org.bxteam.divinemc.config.DivineConfig;
+-import org.bxteam.divinemc.util.NamedAgnosticThreadFactory;
++import org.bxteam.divinemc.util.NamedAgnosticThreadFactoryAffinity;
+ import org.jetbrains.annotations.NotNull;
+ 
+-import java.io.IOException;
+-import java.util.Arrays;
+-import java.util.List;
+-import java.util.concurrent.CompletableFuture;
+-import java.util.concurrent.ConcurrentHashMap;
+-import java.util.concurrent.Executor;
+-import java.util.concurrent.Executors;
+-import java.util.concurrent.atomic.AtomicInteger;
+-import java.util.function.Supplier;
++import static org.bxteam.divinemc.config.DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadCount;
++import static org.bxteam.divinemc.config.DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadPriority;
++import static org.bxteam.divinemc.config.DivineConfig.GuruMode.regionizedChunkTickingAffinity;
+ 
+ public final class RegionizedChunkTicking extends ServerChunkCache {
+-    public static final Executor REGION_EXECUTOR = Executors.newFixedThreadPool(DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadCount,
+-        new NamedAgnosticThreadFactory<>("Region Ticking", TickThread.RegionTickThread::new, DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadPriority));
++    public static final Executor REGION_EXECUTOR = Executors.newFixedThreadPool(regionizedChunkTickingExecutorThreadCount,
++        new NamedAgnosticThreadFactoryAffinity<>("Region Ticking", TickThread.RegionTickThread::new, regionizedChunkTickingExecutorThreadPriority, regionizedChunkTickingAffinity)
++    );
+     public static final boolean CHECK_OWNERSHIP = Boolean.getBoolean("divinemc.rct.checkOwnership");
+     private static final int TILE_SHIFT = 3;
+     private static final int COLORS = 4;
+@@ -515,7 +518,7 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+         final Tile[] ordered = work.toArray(new Tile[0]);
+         final boolean checkOwnership = CHECK_OWNERSHIP && !this.regionMode;
+         final AtomicInteger next = new AtomicInteger();
+-        final int workers = Math.min(count, DivineConfig.AsyncCategory.regionizedChunkTickingExecutorThreadCount);
++        final int workers = Math.min(count, regionizedChunkTickingExecutorThreadCount);
+         final CompletableFuture<?>[] futures = new CompletableFuture<?>[workers];
+         for (int worker = 0; worker < workers; worker++) {
+             futures[worker] = CompletableFuture.runAsync(() -> runInLevel(this.level, () -> {
+diff --git a/src/main/java/org/bxteam/divinemc/async/sensing/ParallelSensorTicker.java b/src/main/java/org/bxteam/divinemc/async/sensing/ParallelSensorTicker.java
+index fd0bb763505d07889df62d635368016b30564436..c977d33228c2487d386c3045905a35586d73a251 100644
+--- a/src/main/java/org/bxteam/divinemc/async/sensing/ParallelSensorTicker.java
++++ b/src/main/java/org/bxteam/divinemc/async/sensing/ParallelSensorTicker.java
+@@ -2,6 +2,13 @@ package org.bxteam.divinemc.async.sensing;
+ 
+ import ca.spottedleaf.moonrise.common.util.TickThread;
+ import com.mojang.logging.LogUtils;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.concurrent.CompletableFuture;
++import java.util.concurrent.ExecutorService;
++import java.util.concurrent.LinkedBlockingQueue;
++import java.util.concurrent.ThreadPoolExecutor;
++import java.util.concurrent.TimeUnit;
+ import net.minecraft.server.MinecraftServer;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.world.entity.Entity;
+@@ -9,16 +16,10 @@ import net.minecraft.world.entity.Mob;
+ import net.minecraft.world.entity.ai.Brain;
+ import net.minecraft.world.entity.ai.sensing.Sensor;
+ import org.bxteam.divinemc.config.DivineConfig;
+-import org.bxteam.divinemc.util.NamedAgnosticThreadFactory;
++import org.bxteam.divinemc.util.NamedAgnosticThreadFactoryAffinity;
+ import org.slf4j.Logger;
+ 
+-import java.util.ArrayList;
+-import java.util.List;
+-import java.util.concurrent.CompletableFuture;
+-import java.util.concurrent.ExecutorService;
+-import java.util.concurrent.LinkedBlockingQueue;
+-import java.util.concurrent.ThreadPoolExecutor;
+-import java.util.concurrent.TimeUnit;
++import static org.bxteam.divinemc.config.DivineConfig.GuruMode.parallelSensorsAffinity;
+ 
+ /**
+  * Runs due AI sensors (read-only world scans) on a worker pool right before entity ticking, one
+@@ -69,7 +70,9 @@ public final class ParallelSensorTicker {
+             DivineConfig.AsyncCategory.parallelSensorsMaxThreads, DivineConfig.AsyncCategory.parallelSensorsMaxThreads,
+             60L, TimeUnit.SECONDS,
+             new LinkedBlockingQueue<>(),
+-            new NamedAgnosticThreadFactory<>("Parallel Sensors", TickThread::new, Thread.NORM_PRIORITY)
++            new NamedAgnosticThreadFactoryAffinity<>("Parallel Sensors", TickThread::new,
++                Thread.NORM_PRIORITY, parallelSensorsAffinity
++            )
+         );
+     }
+ 
+diff --git a/src/main/java/org/bxteam/divinemc/async/tracking/ParallelEntityTracker.java b/src/main/java/org/bxteam/divinemc/async/tracking/ParallelEntityTracker.java
+index 2ad14d556025c1c897eb8b6f1e8cb921b7678072..2f3c24ade44153dbf761f8901a9dd4484d36eaf7 100644
+--- a/src/main/java/org/bxteam/divinemc/async/tracking/ParallelEntityTracker.java
++++ b/src/main/java/org/bxteam/divinemc/async/tracking/ParallelEntityTracker.java
+@@ -5,6 +5,13 @@ import ca.spottedleaf.moonrise.common.misc.NearbyPlayers;
+ import ca.spottedleaf.moonrise.common.util.TickThread;
+ import ca.spottedleaf.moonrise.patches.chunk_system.entity.ChunkSystemEntity;
+ import ca.spottedleaf.moonrise.patches.entity_tracker.EntityTrackerEntity;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.concurrent.CompletableFuture;
++import java.util.concurrent.LinkedBlockingQueue;
++import java.util.concurrent.ThreadPoolExecutor;
++import java.util.concurrent.TimeUnit;
++import java.util.function.Consumer;
+ import net.minecraft.server.level.ChunkMap;
+ import net.minecraft.server.level.FullChunkStatus;
+ import net.minecraft.server.level.ServerLevel;
+@@ -14,16 +21,10 @@ import net.minecraft.world.entity.decoration.ItemFrame;
+ import org.apache.logging.log4j.LogManager;
+ import org.apache.logging.log4j.Logger;
+ import org.bxteam.divinemc.config.DivineConfig;
+-import org.bxteam.divinemc.util.NamedAgnosticThreadFactory;
++import org.bxteam.divinemc.util.NamedAgnosticThreadFactoryAffinity;
+ import org.jetbrains.annotations.Nullable;
+ 
+-import java.util.ArrayList;
+-import java.util.List;
+-import java.util.concurrent.CompletableFuture;
+-import java.util.concurrent.LinkedBlockingQueue;
+-import java.util.concurrent.ThreadPoolExecutor;
+-import java.util.concurrent.TimeUnit;
+-import java.util.function.Consumer;
++import static org.bxteam.divinemc.config.DivineConfig.GuruMode.parallelEntityTrackerAffinity;
+ 
+ public class ParallelEntityTracker {
+     private static final String THREAD_PREFIX = "Parallel Entity Tracker";
+@@ -37,7 +38,9 @@ public class ParallelEntityTracker {
+             DivineConfig.AsyncCategory.parallelTrackerThreads, DivineConfig.AsyncCategory.parallelTrackerThreads,
+             DivineConfig.AsyncCategory.parallelTrackerKeepalive, TimeUnit.SECONDS,
+             new LinkedBlockingQueue<>(),
+-            new NamedAgnosticThreadFactory<>(THREAD_PREFIX, TickThread::new, Thread.NORM_PRIORITY - 2),
++            new NamedAgnosticThreadFactoryAffinity<>(THREAD_PREFIX, TickThread::new,
++                Thread.NORM_PRIORITY - 2, parallelEntityTrackerAffinity
++            ),
+             new ThreadPoolExecutor.CallerRunsPolicy()
+         );
+         pool.allowCoreThreadTimeOut(true);
+diff --git a/src/main/java/org/bxteam/divinemc/config/ConfigCategory.java b/src/main/java/org/bxteam/divinemc/config/ConfigCategory.java
+index 1abeae880a209cf8b18b13f7ad51a6c48713691b..3b4407455ab9400c4169cbea2dc19b6e18152e2c 100644
+--- a/src/main/java/org/bxteam/divinemc/config/ConfigCategory.java
++++ b/src/main/java/org/bxteam/divinemc/config/ConfigCategory.java
+@@ -6,7 +6,8 @@ public enum ConfigCategory {
+     FIXES("fixes"),
+     NETWORK("network"),
+     MISC("misc"),
+-    REGION("region-settings");
++    REGION("region-settings"),
++    GURU_MODE("async.guru-mode");
+ 
+     private final String name;
+ 
+diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
+index 58770e748e9d322a4c646f06f9c2ce40a6668492..3cbb12dd56eddad58dc17f3ae24607f70c482c7b 100644
+--- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
++++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
+@@ -30,6 +30,7 @@ import java.lang.reflect.Method;
+ import java.lang.reflect.Modifier;
+ import java.util.ArrayList;
+ import java.util.Arrays;
++import java.util.Comparator;
+ import java.util.List;
+ import java.util.Locale;
+ import java.util.Random;
+@@ -102,7 +103,17 @@ public class DivineConfig {
+             }
+         }
+ 
+-        for (Class<?> innerClass : clazz.getDeclaredClasses()) {
++        Class<?>[] categories = Arrays.stream(clazz.getDeclaredClasses()).sorted(Comparator.comparingInt(c -> {
++            try {
++                Field category = c.getDeclaredField("category");
++                category.setAccessible(true);
++                return ((ConfigCategory) category.get(null)).ordinal();
++            } catch (NoSuchFieldException | IllegalAccessException e) {
++                throw new RuntimeException(e);
++            }
++        })).toArray(Class<?>[]::new);
++
++        for (Class<?> innerClass : categories) {
+             if (Modifier.isStatic(innerClass.getModifiers())) {
+                 try {
+                     Object innerInstance = null;
+@@ -114,7 +125,15 @@ public class DivineConfig {
+                         continue;
+                     }
+ 
+-                    if (loadMethod != null) {
++                    boolean shouldLoad = true;
++                    try {
++                        Method load = innerClass.getDeclaredMethod("shouldLoad");
++                        load.setAccessible(true);
++                        shouldLoad = (Boolean) load.invoke(null);
++                    } catch (NoSuchMethodException _) {
++                    }
++
++                    if (loadMethod != null && shouldLoad) {
+                         try {
+                             innerInstance = innerClass.getDeclaredConstructor().newInstance();
+                         } catch (NoSuchMethodException e) {
+@@ -235,8 +254,19 @@ public class DivineConfig {
+         return config.getStringList(key);
+     }
+ 
++    private static int[] getIntArray(String key, int[] defaultValue, String... comment) {
++        return getIntArray(key, null, defaultValue, comment);
++    }
++
++    private static int[] getIntArray(String key, @Nullable String oldKey, int[] defaultValue, String... comment) {
++        ensureDefault(key, oldKey, defaultValue, comment);
++        return config.getIntegerList(key).stream().mapToInt(Integer::intValue).toArray();
++    }
++
+     public static class AsyncCategory {
++        private static final ConfigCategory category = ConfigCategory.ASYNC;
+         private static boolean enableAutoAllocation = false;
++        public static boolean guruMode = false;
+ 
+         // Parallel world ticking settings
+         @Experimental("Parallel World Ticking")
+@@ -308,6 +338,12 @@ public class DivineConfig {
+                     LOGGER.info("Detected {} CPU threads", maxThreads);
+                 }
+             }
++
++            guruMode = getBoolean(ConfigCategory.ASYNC.key("guru-mode-enable"), guruMode,
++                "This mode will allow you to cook with thread affinity only enable this when you know exactly what you are doing.",
++                "NO SUPPORT WILL BE GIVEN IF THIS IS ENABLED",
++                "To enable this you need also to set system property 'divinemc.async.guru' to true")
++                       && Boolean.getBoolean("divinemc.async.guru");
+         }
+ 
+         private static void autoAllocation() {
+@@ -502,7 +538,29 @@ public class DivineConfig {
+         }
+     }
+ 
++    public static class GuruMode {
++        private static final ConfigCategory category = ConfigCategory.GURU_MODE;
++        public static int[] regionizedChunkTickingAffinity = new int[0];
++        public static int[] asyncPathfindingAffinity = new int[0];
++        public static int[] parallelSensorsAffinity = new int[0];
++        public static int[] parallelEntityTrackerAffinity = new int[0];
++        public static int[] asyncChunkSendingAffinity = new int[0];
++
++        public static boolean shouldLoad() {
++            return AsyncCategory.guruMode;
++        }
++
++        public static void load() {
++            regionizedChunkTickingAffinity = getIntArray(ConfigCategory.GURU_MODE.key("regionized-chunk-ticking-affinity"), regionizedChunkTickingAffinity);
++            asyncPathfindingAffinity = getIntArray(ConfigCategory.GURU_MODE.key("async-pathfinding-affinity"), asyncPathfindingAffinity);
++            parallelSensorsAffinity = getIntArray(ConfigCategory.GURU_MODE.key("parallel-sensors-affinity"), parallelSensorsAffinity);
++            parallelEntityTrackerAffinity = getIntArray(ConfigCategory.GURU_MODE.key("parallel-entity-tracker-affinity"), parallelEntityTrackerAffinity);
++            asyncChunkSendingAffinity = getIntArray(ConfigCategory.GURU_MODE.key("async-chunk-sending-affinity"), asyncChunkSendingAffinity);
++        }
++    }
++
+     public static class PerformanceCategory {
++        private static final ConfigCategory category = ConfigCategory.PERFORMANCE;
+         // Chunk settings
+         public static boolean nativeAccelerationEnabled = false;
+         public static boolean allowAVX512 = false;
+@@ -726,6 +784,7 @@ public class DivineConfig {
+     }
+ 
+     public static class FixesCategory {
++        private static final ConfigCategory category = ConfigCategory.FIXES;
+         // Gameplay fixes
+         public static boolean fixIncorrectBounceLogic = false;
+         public static boolean updateSuppressionCrashFix = true;
+@@ -798,6 +857,7 @@ public class DivineConfig {
+     }
+ 
+     public static class MiscCategory {
++        private static final ConfigCategory category = ConfigCategory.MISC;
+         // Secure seed
+         public static boolean enableSecureSeed = false;
+         public static HashingVersion secureSeedHashingVersion = HashingVersion.BLAKE2B;
+@@ -882,6 +942,7 @@ public class DivineConfig {
+     }
+ 
+     public static class NetworkCategory {
++        private static final ConfigCategory category = ConfigCategory.NETWORK;
+         // General network settings
+         public static boolean optimizeNonFlushPacketSending = false;
+         public static boolean disableDisconnectSpam = false;
+@@ -1057,6 +1118,7 @@ public class DivineConfig {
+     }
+ 
+     public static class RegionSettingsCategory {
++        private static final ConfigCategory category = ConfigCategory.REGION;
+         // Region Format
+         public static EnumRegionFileExtension regionFileType = EnumRegionFileExtension.MCA;
+         public static int compressionLevel = 4;
+diff --git a/src/main/java/org/bxteam/divinemc/util/NamedAgnosticThreadFactoryAffinity.java b/src/main/java/org/bxteam/divinemc/util/NamedAgnosticThreadFactoryAffinity.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..5eadaf270a71e1a2a1f1f5a296160b23608d3511
+--- /dev/null
++++ b/src/main/java/org/bxteam/divinemc/util/NamedAgnosticThreadFactoryAffinity.java
+@@ -0,0 +1,57 @@
++package org.bxteam.divinemc.util;
++
++import it.unimi.dsi.fastutil.ints.IntArrayList;
++import net.openhft.affinity.AffinityLock;
++import org.jspecify.annotations.NonNull;
++
++import java.lang.reflect.InvocationTargetException;
++import java.lang.reflect.Method;
++import java.util.concurrent.atomic.AtomicInteger;
++
++import static org.bxteam.divinemc.config.DivineConfig.AsyncCategory.guruMode;
++
++public class NamedAgnosticThreadFactoryAffinity<T extends Thread> extends NamedAgnosticThreadFactory<T> {
++    private final IntArrayList affinityList;
++    private final AtomicInteger threadNumber = new AtomicInteger();
++    private final boolean enabled;
++
++    public NamedAgnosticThreadFactoryAffinity(
++        final String name,
++        final ThreadBuilderFunction<T> typeOfThread,
++        final int priority,
++        final int[] affinityList
++    ) {
++        super(name, typeOfThread, priority);
++        this.enabled = guruMode && !(affinityList == null || affinityList.length == 0);
++        this.affinityList = new IntArrayList(affinityList);
++    }
++
++    @Override
++    public Thread newThread(@NonNull Runnable runnable) {
++        if (!enabled) return super.newThread(runnable);
++        final int cpuId = affinityList.getInt(Math.floorMod(threadNumber.getAndIncrement(), affinityList.size()));
++        return super.newThread(() -> {
++            if (cpuId == 0) {
++                AffinityLock lock = null;
++                try {
++                    Method tryAcquireLock = AffinityLock.class.getDeclaredMethod("tryAcquireLock", boolean.class, int.class);
++                    tryAcquireLock.setAccessible(true);
++                    lock = (AffinityLock) tryAcquireLock.invoke(null, true, cpuId);
++                    runnable.run();
++                } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
++                    throw new RuntimeException(e);
++                } finally {
++                    if (lock != null) {
++                        lock.release();
++                    }
++                }
++
++                return;
++            }
++            try (AffinityLock ignored = AffinityLock.acquireLock(cpuId)) {
++                runnable.run();
++            }
++        });
++    }
++}
++
