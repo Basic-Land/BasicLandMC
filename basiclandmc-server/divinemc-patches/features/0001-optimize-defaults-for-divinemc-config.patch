@@ -5,7 +5,7 @@ Subject: [PATCH] optimize-defaults-for-divinemc-config
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index 817b907cf3fa5e7ef28137775f247c6aa419f60a..58770e748e9d322a4c646f06f9c2ce40a6668492 100644
+index 817b907cf3fa5e7ef28137775f247c6aa419f60a..87dec61557c82f3afd0914629bacdb21dac9f8d4 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 @@ -240,7 +240,7 @@ public class DivineConfig {
@@ -17,7 +17,7 @@ index 817b907cf3fa5e7ef28137775f247c6aa419f60a..58770e748e9d322a4c646f06f9c2ce40
          public static int parallelThreadCount = 4;
          public static boolean logContainerCreationStacktraces = false;
          public static boolean disableHardThrow = false;
-@@ -249,8 +249,8 @@ public class DivineConfig {
+@@ -249,24 +249,24 @@ public class DivineConfig {
  
          // Regionized chunk ticking
          @Experimental("Regionized Chunk Ticking")
@@ -28,6 +28,36 @@ index 817b907cf3fa5e7ef28137775f247c6aa419f60a..58770e748e9d322a4c646f06f9c2ce40
          public static int regionizedChunkTickingExecutorThreadPriority = Thread.NORM_PRIORITY + 2;
  
          // Async pathfinding settings
+         public static boolean asyncPathfinding = true;
+-        public static int asyncPathfindingMaxThreads = 1;
++        public static int asyncPathfindingMaxThreads = 2; // BasiclandMC optimize defaults
+         public static int asyncPathfindingKeepalive = 60;
+         public static int asyncPathfindingQueueSize = 0;
+         public static PathfindTaskRejectPolicy asyncPathfindingRejectPolicy = PathfindTaskRejectPolicy.CALLER_RUNS;
+ 
+         // Parallel entity tracker settings
+         public static boolean parallelTrackerEnabled = true;
+-        public static int parallelTrackerThreads = 0;
++        public static int parallelTrackerThreads = 2; // BasiclandMC optimize defaults
+         public static int parallelTrackerKeepalive = 60;
+ 
+         // Async chunk sending settings
+-        public static boolean asyncChunkSendingEnabled = false;
++        public static boolean asyncChunkSendingEnabled = true; // BasiclandMC optimize defaults
+         public static int asyncChunkSendingMaxThreads = 1;
+ 
+         // Async mob spawning settings
+@@ -278,8 +278,8 @@ public class DivineConfig {
+ 
+         // Parallel sensor phase settings
+         @Experimental("Parallel Sensor Phase")
+-        public static boolean parallelSensorsEnabled = false;
+-        public static int parallelSensorsMaxThreads = 0;
++        public static boolean parallelSensorsEnabled = true; // BasiclandMC optimize defaults
++        public static int parallelSensorsMaxThreads = 2; // BasiclandMC optimize defaults
+ 
+         public static void load() {
+             enableAutoAllocation();
 @@ -535,7 +535,7 @@ public class DivineConfig {
          public static int hopperThrottleSkipTicks = 0;
  

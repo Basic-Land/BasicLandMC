@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: dan28000 <84990628+dan28000@users.noreply.github.com>
-Date: Thu, 8 Oct 2026 12:52:24 +0200
+Date: Thu, 8 Oct 2026 01:34:10 +0200
 Subject: [PATCH] thread-affinity
 
 
@@ -94,7 +94,7 @@ index 19232b85c41fe5d588461f4639fefa955aea92d2..a736e0f1ea564458e2fdb20000be3f5e
              new RejectionHandler()
          );
 diff --git a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
-index 95812c324ebdaba866f76407eda549b676c4eb27..7661a8ae30352a51d65d5896c68b3b4bc9c884e0 100644
+index d30630d125b15e7ae81256c9a726bdb2a9ff67dc..7661a8ae30352a51d65d5896c68b3b4bc9c884e0 100644
 --- a/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
 +++ b/src/main/java/org/bxteam/divinemc/async/rct/RegionizedChunkTicking.java
 @@ -11,6 +11,15 @@ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
@@ -144,6 +144,15 @@ index 95812c324ebdaba866f76407eda549b676c4eb27..7661a8ae30352a51d65d5896c68b3b4b
      public static final boolean CHECK_OWNERSHIP = Boolean.getBoolean("divinemc.rct.checkOwnership");
      private static final int TILE_SHIFT = 3;
      private static final int COLORS = 4;
+@@ -106,7 +109,7 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
+         final SavedDataStorage savedDataStorage
+     ) {
+         super(level, levelStorageAccess, fixerUpper, structureTemplateManager, executor, generator, viewDistance, simulationDistance, sync, chunkStatusListener, overworldDataStorage, savedDataStorage);
+-        this.avgTimeLogger = new AvgTimeLogger(level.serverLevelData.getLevelName());
++        this.avgTimeLogger = new AvgTimeLogger(level.bukkitName);
+         for (int color = 0; color < COLORS; color++) {
+             this.tilesByColor[color] = new ObjectArrayList<>();
+         }
 @@ -515,7 +518,7 @@ public final class RegionizedChunkTicking extends ServerChunkCache {
          final Tile[] ordered = work.toArray(new Tile[0]);
          final boolean checkOwnership = CHECK_OWNERSHIP && !this.regionMode;
@@ -264,7 +273,7 @@ index 1abeae880a209cf8b18b13f7ad51a6c48713691b..3b4407455ab9400c4169cbea2dc19b6e
      private final String name;
  
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index 58770e748e9d322a4c646f06f9c2ce40a6668492..3cbb12dd56eddad58dc17f3ae24607f70c482c7b 100644
+index 87dec61557c82f3afd0914629bacdb21dac9f8d4..98435a5f96ff3f6aeff9493e46c153e677e1522c 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 @@ -30,6 +30,7 @@ import java.lang.reflect.Method;
@@ -275,7 +284,7 @@ index 58770e748e9d322a4c646f06f9c2ce40a6668492..3cbb12dd56eddad58dc17f3ae24607f7
  import java.util.List;
  import java.util.Locale;
  import java.util.Random;
-@@ -102,7 +103,17 @@ public class DivineConfig {
+@@ -102,11 +103,21 @@ public class DivineConfig {
              }
          }
  
@@ -293,7 +302,13 @@ index 58770e748e9d322a4c646f06f9c2ce40a6668492..3cbb12dd56eddad58dc17f3ae24607f7
 +        for (Class<?> innerClass : categories) {
              if (Modifier.isStatic(innerClass.getModifiers())) {
                  try {
-                     Object innerInstance = null;
+-                    Object innerInstance = null;
+-                    Method loadMethod = null;
++                    Object innerInstance;
++                    Method loadMethod;
+                     try {
+                         loadMethod = innerClass.getDeclaredMethod("load");
+                     } catch (NoSuchMethodException ignored) {
 @@ -114,7 +125,15 @@ public class DivineConfig {
                          continue;
                      }
