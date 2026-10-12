@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Sat, 10 Oct 2026 11:41:57 +0200
+Subject: [PATCH] colors
+
+
+diff --git a/src/main/java/org/bxteam/divinemc/command/subcommands/MSPTCommand.java b/src/main/java/org/bxteam/divinemc/command/subcommands/MSPTCommand.java
+index 847519502745cea8c8b614c12f993f54fc725f53..0e6ff1bc543270e386962a493ccca0e1962ead6e 100644
+--- a/src/main/java/org/bxteam/divinemc/command/subcommands/MSPTCommand.java
++++ b/src/main/java/org/bxteam/divinemc/command/subcommands/MSPTCommand.java
+@@ -157,8 +157,8 @@ public final class MSPTCommand extends DivineSubCommandPermission {
+ 
+     private static Component getColoredValue(double value) {
+         NamedTextColor color = value >= 50 ? RED
+-            : value >= 40 ? YELLOW
+-            : value >= 30 ? NamedTextColor.GOLD
++            : value >= 40 ? GOLD
++            : value >= 30 ? YELLOW
+             : value >= 20 ? GREEN
+             : AQUA;
+         return Component.text(DF.format(value) + "ms", color);
+diff --git a/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java b/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
+index ca5e7474a08ef065450ea035de19ae9dbf322426..ded7daa45c4ed6f03051095044a84bf590163830 100644
+--- a/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
++++ b/src/main/java/org/bxteam/divinemc/command/subcommands/TickTimes.java
+@@ -170,8 +170,8 @@ public final class TickTimes extends DivineSubCommandPermission {
+ 
+     private static Component getColoredValue(double value) {
+         NamedTextColor color = value >= 35 ? RED
+-            : value >= 30 ? YELLOW
+-              : value >= 25 ? GOLD
++            : value >= 30 ? GOLD
++              : value >= 25 ? YELLOW
+                 : value >= 15 ? GREEN
+                   : AQUA;
+         return text(DF.format(value) + "ms", color);
