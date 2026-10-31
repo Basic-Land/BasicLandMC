@@ -5,10 +5,10 @@ Subject: [PATCH] optimize-defaults-for-divinemc-config
 
 
 diff --git a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-index 817b907cf3fa5e7ef28137775f247c6aa419f60a..87dec61557c82f3afd0914629bacdb21dac9f8d4 100644
+index 1384ba5bb8fbcfb1b189df19aef64cd0ed78d939..98435a5f96ff3f6aeff9493e46c153e677e1522c 100644
 --- a/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
 +++ b/src/main/java/org/bxteam/divinemc/config/DivineConfig.java
-@@ -240,7 +240,7 @@ public class DivineConfig {
+@@ -270,7 +270,7 @@ public class DivineConfig {
  
          // Parallel world ticking settings
          @Experimental("Parallel World Ticking")
@@ -17,7 +17,7 @@ index 817b907cf3fa5e7ef28137775f247c6aa419f60a..87dec61557c82f3afd0914629bacdb21
          public static int parallelThreadCount = 4;
          public static boolean logContainerCreationStacktraces = false;
          public static boolean disableHardThrow = false;
-@@ -249,24 +249,24 @@ public class DivineConfig {
+@@ -279,24 +279,24 @@ public class DivineConfig {
  
          // Regionized chunk ticking
          @Experimental("Regionized Chunk Ticking")
@@ -47,7 +47,7 @@ index 817b907cf3fa5e7ef28137775f247c6aa419f60a..87dec61557c82f3afd0914629bacdb21
          public static int asyncChunkSendingMaxThreads = 1;
  
          // Async mob spawning settings
-@@ -278,8 +278,8 @@ public class DivineConfig {
+@@ -308,8 +308,8 @@ public class DivineConfig {
  
          // Parallel sensor phase settings
          @Experimental("Parallel Sensor Phase")
@@ -58,7 +58,7 @@ index 817b907cf3fa5e7ef28137775f247c6aa419f60a..87dec61557c82f3afd0914629bacdb21
  
          public static void load() {
              enableAutoAllocation();
-@@ -535,7 +535,7 @@ public class DivineConfig {
+@@ -593,7 +593,7 @@ public class DivineConfig {
          public static int hopperThrottleSkipTicks = 0;
  
          // DAB settings
@@ -67,7 +67,7 @@ index 817b907cf3fa5e7ef28137775f247c6aa419f60a..87dec61557c82f3afd0914629bacdb21
          public static int dabStartDistance = 12;
          public static int dabStartDistanceSquared;
          public static int dabMaximumActivationFrequency = 20;
-@@ -891,7 +891,7 @@ public class DivineConfig {
+@@ -952,7 +952,7 @@ public class DivineConfig {
          public static int playerProfileResultCachingTimeout = 1440;
  
          // No chat reports
@@ -76,7 +76,7 @@ index 817b907cf3fa5e7ef28137775f247c6aa419f60a..87dec61557c82f3afd0914629bacdb21
          public static boolean noChatReportsAddQueryData = true;
          public static boolean noChatReportsConvertToGameMessage = true;
          public static boolean noChatReportsDebugLog = false;
-@@ -900,12 +900,12 @@ public class DivineConfig {
+@@ -961,12 +961,12 @@ public class DivineConfig {
  
          // Protocols
          public static boolean protocolsStrictMode = false;
