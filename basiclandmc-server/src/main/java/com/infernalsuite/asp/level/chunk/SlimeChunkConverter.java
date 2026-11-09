@@ -1,4 +1,4 @@
-package java.com.infernalsuite.asp.level.chunk;
+package com.infernalsuite.asp.level.chunk;
 
 import ca.spottedleaf.moonrise.patches.chunk_system.level.poi.PoiChunk;
 import ca.spottedleaf.moonrise.patches.starlight.light.SWMRNibbleArray;

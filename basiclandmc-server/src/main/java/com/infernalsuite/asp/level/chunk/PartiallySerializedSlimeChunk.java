@@ -1,4 +1,4 @@
-package java.com.infernalsuite.asp.level.chunk;
+package com.infernalsuite.asp.level.chunk;
 
 import com.infernalsuite.asp.Converter;
 import com.infernalsuite.asp.api.utils.NibbleArray;

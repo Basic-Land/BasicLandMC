@@ -1,4 +1,4 @@
-package java.com.infernalsuite.asp.config;
+package com.infernalsuite.asp.config;
 
 import io.papermc.paper.configuration.Configurations;
 import io.papermc.paper.configuration.PaperConfigurations;

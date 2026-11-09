@@ -1,4 +1,4 @@
-package java.com.infernalsuite.asp;
+package com.infernalsuite.asp;
 
 import com.infernalsuite.asp.api.utils.NibbleArray;
 import java.io.IOException;

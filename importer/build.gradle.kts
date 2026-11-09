@@ -6,7 +6,7 @@ plugins {
 dependencies {
     implementation(project(":api"))
     implementation(project(":core"))
-    implementation(project(":aspaper-api"))
+    implementation(project(":basiclandmc-api"))
 }
 
 tasks {

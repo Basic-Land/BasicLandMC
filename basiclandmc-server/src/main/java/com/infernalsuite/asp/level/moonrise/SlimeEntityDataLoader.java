@@ -1,4 +1,4 @@
-package java.com.infernalsuite.asp.level.moonrise;
+package com.infernalsuite.asp.level.moonrise;
 
 import ca.spottedleaf.moonrise.patches.chunk_system.io.datacontroller.EntityDataController;
 import ca.spottedleaf.moonrise.patches.chunk_system.scheduling.ChunkTaskScheduler;

@@ -1,4 +1,4 @@
-package java.com.infernalsuite.asp;
+package com.infernalsuite.asp;
 
 import com.infernalsuite.asp.api.AdvancedSlimePaperAPI;
 import com.infernalsuite.asp.api.SlimeNMSBridge;

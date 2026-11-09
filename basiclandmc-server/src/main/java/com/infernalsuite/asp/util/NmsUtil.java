@@ -1,4 +1,4 @@
-package java.com.infernalsuite.asp.util;
+package com.infernalsuite.asp.util;
 
 import ca.spottedleaf.moonrise.patches.chunk_system.scheduling.NewChunkHolder;
 import com.infernalsuite.asp.InternalPlugin;

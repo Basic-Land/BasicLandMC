@@ -70,12 +70,13 @@
      }
  }
  val log4jPlugins = sourceSets.create("log4jPlugins") {
-@@ -167,11 +_,12 @@
+@@ -167,11 +_,13 @@
  }
  
  dependencies {
 -    implementation(project(":divinemc-api")) // DivineMC - Rebrand
 +    implementation(project(":basiclandmc-api")) // DivineMC - Rebrand
++    implementation(project(":core")) //ASP
 +    implementation("net.openhft:affinity:2026.2")
  
      // DivineMC start - Dependencies
@@ -86,7 +87,7 @@
      }
      implementation("com.github.luben:zstd-jni:1.5.7-12")
      implementation("at.yawk.lz4:lz4-java:1.11.2")
-@@ -260,14 +_,14 @@
+@@ -261,14 +_,14 @@
          val channel = rootProject.providers.gradleProperty("channel").get() // DivineMC - Channel
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",

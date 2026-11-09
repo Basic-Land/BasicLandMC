@@ -1,4 +1,4 @@
-package java.com.infernalsuite.asp.level;
+package com.infernalsuite.asp.level;
 
 import com.infernalsuite.asp.api.world.SlimeWorld;
 

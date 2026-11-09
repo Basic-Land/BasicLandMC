@@ -1,0 +1,135 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Mon, 9 Nov 2026 21:17:45 +0100
+Subject: [PATCH] ASP
+
+
+diff --git a/src/main/java/io/papermc/paper/world/PaperWorldLoader.java b/src/main/java/io/papermc/paper/world/PaperWorldLoader.java
+index 66ee5e01f18946d30ff322b3d8a4eb93677a7373..ec1cde5633ccaa1d263e4c4615641b5e552ad981 100644
+--- a/src/main/java/io/papermc/paper/world/PaperWorldLoader.java
++++ b/src/main/java/io/papermc/paper/world/PaperWorldLoader.java
+@@ -123,11 +123,28 @@ public record PaperWorldLoader(MinecraftServer server, String levelId) {
+         final Registry<LevelStem> levelStemRegistry = this.server.registryAccess().lookupOrThrow(Registries.LEVEL_STEM);
+         final LevelStem overworldStem = requireNonNull(levelStemRegistry.getValue(LevelStem.OVERWORLD), "Overworld stem missing");
+         final boolean hasWorldData = this.hasDimensionData(overworldStem);
+-        this.loadInitialWorld(overworldStem, hasWorldData);
++
++        //ASP start - overwrite vanilla worlds if needed
++        if(!com.infernalsuite.asp.SlimeNMSBridgeImpl.instance().loadOverworldOverride()) {
++            this.loadInitialWorld(overworldStem, hasWorldData);
++        }
++        //ASP end - overwrite vanilla worlds if needed
++
+         for (final LevelStem stem : levelStemRegistry) {
+             if (stem == overworldStem) {
+                 continue;
+             }
++
++            //ASP start - overwrite vanilla worlds if needed
++            ResourceKey<LevelStem> levelStemKey = levelStemRegistry.getResourceKey(stem).get();
++            if(levelStemKey == LevelStem.NETHER && com.infernalsuite.asp.SlimeNMSBridgeImpl.instance().loadNetherOverride()) {
++                continue;
++            }
++            if(levelStemKey == LevelStem.END && com.infernalsuite.asp.SlimeNMSBridgeImpl.instance().loadEndOverride()) {
++                continue;
++            }
++            //ASP end - overwrite vanilla worlds if needed
++
+             this.loadInitialWorld(stem, this.hasDimensionData(stem));
+         }
+ 
+diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+index 2583ef7be8c5b1ab9f1981278a4a21fa95808023..875aec79610dd911b175d89e92664e3cb215fe5f 100644
+--- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+@@ -1373,6 +1373,8 @@ public final class CraftServer implements Server {
+             return false;
+         }
+ 
++        com.infernalsuite.asp.AdvancedSlimePaper.instance().onWorldUnload(world.getName()); // ASP - Remove unloaded world from map
++
+         try {
+             if (save) {
+                 handle.save(null, true, false); // Paper - Fix saving in unloadWorld
+@@ -1380,6 +1382,12 @@ public final class CraftServer implements Server {
+ 
+             handle.getChunkSource().close(save);
+             io.papermc.paper.FeatureHooks.closeEntityManager(handle, save); // SPIGOT-6722: close entityManager // Paper - chunk system
++
++            //ASP start - avoid temp storage leak during runtime
++            if (handle instanceof com.infernalsuite.asp.level.SlimeLevelInstance asp) {
++                asp.deleteTempFiles();
++            }
++            //ASP end
+         } catch (Exception ex) {
+             this.getLogger().log(Level.SEVERE, null, ex);
+         }
+diff --git a/src/main/java/org/spigotmc/SpigotConfig.java b/src/main/java/org/spigotmc/SpigotConfig.java
+index 2d980416885ec4b39aaf74509b5519f86ab29195..eb40d1165478a77c453057d3c47b893a2adf1325 100644
+--- a/src/main/java/org/spigotmc/SpigotConfig.java
++++ b/src/main/java/org/spigotmc/SpigotConfig.java
+@@ -79,7 +79,12 @@ public class SpigotConfig {
+         }
+     }
+ 
++    // ASP start - Improve Slime IO
+     public static void readConfig(Class<?> clazz, Object instance) {
++        readConfig(clazz, instance, true);
++    }
++    public static void readConfig(Class<?> clazz, Object instance, boolean save) {
++        // ASP end - Improve Slime IO
+         for (Method method : clazz.getDeclaredMethods()) {
+             if (Modifier.isPrivate(method.getModifiers())) {
+                 if (method.getParameterTypes().length == 0 && method.getReturnType() == Void.TYPE) {
+@@ -96,7 +101,11 @@ public class SpigotConfig {
+         }
+ 
+         try {
+-            SpigotConfig.config.save(SpigotConfig.CONFIG_FILE);
++            // ASP start - Improve Slime IO
++            if (save) {
++                SpigotConfig.config.save(SpigotConfig.CONFIG_FILE);
++            }
++            // ASP end - Improve Slime IO
+         } catch (IOException ex) {
+             Bukkit.getLogger().log(Level.SEVERE, "Could not save " + SpigotConfig.CONFIG_FILE, ex);
+         }
+diff --git a/src/main/java/org/spigotmc/SpigotWorldConfig.java b/src/main/java/org/spigotmc/SpigotWorldConfig.java
+index 339832e312578ee385bbf3c9d5c131435abe7d7a..e8daa4f746f0c5fed8a465efb3f7b58483432815 100644
+--- a/src/main/java/org/spigotmc/SpigotWorldConfig.java
++++ b/src/main/java/org/spigotmc/SpigotWorldConfig.java
+@@ -14,14 +14,25 @@ public class SpigotWorldConfig {
+     private final YamlConfiguration config;
+     private boolean verbose;
+ 
++    // ASP start - Improve Slime IO
+     public SpigotWorldConfig(String legacyWorldName, Key worldKey) {
++        this(legacyWorldName, worldKey, true);
++    }
++    // ASP end - Improve Slime IO
++
++    public SpigotWorldConfig(String legacyWorldName, Key worldKey, boolean saveOnLoad) { // ASP - Improve Slime IO
+         this.legacyWorldName = legacyWorldName;
+         this.worldName = worldKey.asString();
+         this.config = SpigotConfig.config;
+         this.init();
+     }
+ 
++    // ASP start - Improve Slime IO
+     public void init() {
++        init(true);
++    }
++    public void init(boolean saveOnLoad) {
++        // ASP end - Improve Slime IO
+         this.verbose = this.getBoolean("verbose", false); // Paper
+         if (SpigotConfig.version <= 12) {
+             ConfigurationSection section = this.config.getConfigurationSection("world-settings." + this.legacyWorldName);
+@@ -33,7 +44,7 @@ public class SpigotWorldConfig {
+         }
+ 
+         this.log("-------- World Settings For [" + this.worldName + "] --------");
+-        SpigotConfig.readConfig(SpigotWorldConfig.class, this);
++        SpigotConfig.readConfig(SpigotWorldConfig.class, this, saveOnLoad); // ASP - Improve Slime IO
+     }
+ 
+     private void log(String s) {

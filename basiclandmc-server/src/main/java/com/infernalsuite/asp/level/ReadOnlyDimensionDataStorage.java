@@ -1,4 +1,4 @@
-package java.com.infernalsuite.asp.level;
+package com.infernalsuite.asp.level;
 
 import com.mojang.datafixers.DataFixer;
 import java.nio.file.Path;

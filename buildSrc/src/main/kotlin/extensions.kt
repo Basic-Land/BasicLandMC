@@ -21,4 +21,4 @@ val Provider<out FileSystemLocation>.pathOrNull: Path?
     get() = orNull?.path
 
 fun Project.paperApi(): Dependency =
-    dependencies.create("io.papermc.paper:paper-api:${rootProject.providers.gradleProperty("version").get()}")
+    dependencies.create("io.papermc.paper:paper-api:26.2.build.40-alpha")

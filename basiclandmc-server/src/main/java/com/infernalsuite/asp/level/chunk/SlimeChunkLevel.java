@@ -1,4 +1,4 @@
-package java.com.infernalsuite.asp.level.chunk;
+package com.infernalsuite.asp.level.chunk;
 
 import com.infernalsuite.asp.api.world.SlimeChunk;
 import com.infernalsuite.asp.level.SlimeInMemoryWorld;

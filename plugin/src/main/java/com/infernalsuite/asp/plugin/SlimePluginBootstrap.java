@@ -16,7 +16,7 @@ public class SlimePluginBootstrap implements PluginBootstrap {
 
     @Override
     public void bootstrap(BootstrapContext bootstrapContext) {
-        if(!ServerBuildInfo.buildInfo().isBrandCompatible(Key.key("infernalsuite", "advancedslimepaper"))) {
+        if(!ServerBuildInfo.buildInfo().isBrandCompatible(Key.key("basicland", "basiclandmc"))) { // BasiclandMC make it work here
 
             ComponentLogger logger = bootstrapContext.getLogger();
             logger.error("================================================");

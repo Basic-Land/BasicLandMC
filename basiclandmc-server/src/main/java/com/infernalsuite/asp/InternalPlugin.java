@@ -1,4 +1,4 @@
-package java.com.infernalsuite.asp;
+package com.infernalsuite.asp;
 
 import io.papermc.paper.plugin.lifecycle.event.LifecycleEventManager;
 import java.io.File;
