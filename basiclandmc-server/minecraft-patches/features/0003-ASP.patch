@@ -16,6 +16,45 @@ index 42b1160f2d7aba6b29c036c925c83c955205db65..619f561f73af9c9ceab1c07051f1311d
          return chunk instanceof LevelChunk levelChunk && levelChunk.mustNotSave;
      }
  
+diff --git a/ca/spottedleaf/moonrise/patches/chunk_system/io/datacontroller/EntityDataController.java b/ca/spottedleaf/moonrise/patches/chunk_system/io/datacontroller/EntityDataController.java
+index 992d19e1b08fa84325e7bb3c3d7d0b9dff4cdd3b..27cd98df321cce55a27249b235e0cea5bfcbb9e8 100644
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/io/datacontroller/EntityDataController.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/io/datacontroller/EntityDataController.java
+@@ -11,7 +11,7 @@ import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
+ import java.io.IOException;
+ import java.nio.file.Path;
+ 
+-public final class EntityDataController extends MoonriseRegionFileIO.RegionDataController {
++public class EntityDataController extends MoonriseRegionFileIO.RegionDataController { //ASP make non-final
+ 
+     private final EntityRegionFileStorage storage;
+ 
+diff --git a/ca/spottedleaf/moonrise/patches/chunk_system/io/datacontroller/PoiDataController.java b/ca/spottedleaf/moonrise/patches/chunk_system/io/datacontroller/PoiDataController.java
+index bd0d782852f9cfe5bc0b5339ecf4d82c10332ec9..7f44b5e2809841e5ee9c88af6fda4e4598fb7df9 100644
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/io/datacontroller/PoiDataController.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/io/datacontroller/PoiDataController.java
+@@ -9,7 +9,7 @@ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.world.level.chunk.storage.RegionFileStorage;
+ import java.io.IOException;
+ 
+-public final class PoiDataController extends MoonriseRegionFileIO.RegionDataController {
++public class PoiDataController extends MoonriseRegionFileIO.RegionDataController { //ASP make non-final
+ 
+     private final ServerLevel world;
+ 
+diff --git a/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/ChunkEntitySlices.java b/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/ChunkEntitySlices.java
+index 1651698b79fd62b20c18a931849f8b4711d4d654..73d7cc715106b14a59d244562af2b6be877432a4 100644
+--- a/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/ChunkEntitySlices.java
++++ b/ca/spottedleaf/moonrise/patches/chunk_system/level/entity/ChunkEntitySlices.java
+@@ -53,7 +53,7 @@ public final class ChunkEntitySlices {
+     private volatile Reference2ObjectOpenHashMap<Class<? extends Entity>, EntityCollectionBySection> entitiesByClass;
+     private volatile Reference2ObjectOpenHashMap<EntityType<?>, EntityCollectionBySection> entitiesByType;
+     // DivineMC end - Entity Status Lock - copy-on-write lookup maps
+-    private final EntityList entities = new EntityList();
++    public final EntityList entities = new EntityList(); //ASP make non-private
+ 
+     public FullChunkStatus status;
+     public final ChunkData chunkData;
 diff --git a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java b/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
 index 17307633d973c0aa8c00a57c88519037d103f683..49c58d7ebaf2342f4a112ecfaf3b5940efd055dd 100644
 --- a/ca/spottedleaf/moonrise/patches/chunk_system/scheduling/ChunkHolderManager.java
@@ -121,10 +160,50 @@ index 7463cf5bf871033a0e5f6d54dd0d427c474d7cd4..12432af58d5ff714935aa08d624387fe
          private ChunkDataLoadTask(final ChunkTaskScheduler scheduler, final ServerLevel world, final int chunkX,
                                    final int chunkZ, final Priority priority) {
              super(scheduler, world, chunkX, chunkZ, MoonriseRegionFileIO.RegionFileType.CHUNK_DATA, priority);
+diff --git a/net/minecraft/nbt/CompoundTag.java b/net/minecraft/nbt/CompoundTag.java
+index b9f6aa790159b2df712244c44c55d6393c837d16..9328cf533a9c87ffd423570b0d230ecf2346e555 100644
+--- a/net/minecraft/nbt/CompoundTag.java
++++ b/net/minecraft/nbt/CompoundTag.java
+@@ -160,7 +160,7 @@ public final class CompoundTag implements Tag {
+     };
+     private final Map<String, Tag> tags;
+ 
+-    CompoundTag(final Map<String, Tag> tags) {
++    public CompoundTag(final Map<String, Tag> tags) { //ASP make non-private
+         this.tags = tags;
+     }
+ 
+diff --git a/net/minecraft/server/MinecraftServer.java b/net/minecraft/server/MinecraftServer.java
+index d9bb96836141643514d6c79080fd04f22f5380a0..025beed4a0cdd9a9242ff93b02a74253a495d847 100644
+--- a/net/minecraft/server/MinecraftServer.java
++++ b/net/minecraft/server/MinecraftServer.java
+@@ -271,7 +271,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+     private final WorldGenSettings worldGenSettings;
+     private final ServerScoreboard scoreboard = new ServerScoreboard(this);
+     private @Nullable Stopwatches stopwatches;
+-    private @Nullable CommandStorage commandStorage;
++    public @Nullable CommandStorage commandStorage; //ASP make non-private
+     private final CustomBossEvents customBossEvents;
+     private final RandomSequences randomSequences;
+     // Paper - per-level WeatherData
 diff --git a/net/minecraft/server/level/ServerLevel.java b/net/minecraft/server/level/ServerLevel.java
-index d5bbe296991137714ec12668a60927f2d6cd45ee..f6b0e4efe1ac71df184afed46580000cde6e8a0f 100644
+index d5bbe296991137714ec12668a60927f2d6cd45ee..00af27c3ced3d2df663b23b9bf94175a15d9910d 100644
 --- a/net/minecraft/server/level/ServerLevel.java
 +++ b/net/minecraft/server/level/ServerLevel.java
+@@ -319,10 +319,10 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+     // Paper start - rewrite chunk system
+     private final ca.spottedleaf.moonrise.patches.chunk_system.player.RegionizedPlayerChunkLoader.ViewDistanceHolder viewDistanceHolder = new ca.spottedleaf.moonrise.patches.chunk_system.player.RegionizedPlayerChunkLoader.ViewDistanceHolder();
+     private final ca.spottedleaf.moonrise.patches.chunk_system.player.RegionizedPlayerChunkLoader chunkLoader = new ca.spottedleaf.moonrise.patches.chunk_system.player.RegionizedPlayerChunkLoader((ServerLevel)(Object)this);
+-    private final ca.spottedleaf.moonrise.patches.chunk_system.io.datacontroller.EntityDataController entityDataController;
+-    private final ca.spottedleaf.moonrise.patches.chunk_system.io.datacontroller.PoiDataController poiDataController;
++    protected ca.spottedleaf.moonrise.patches.chunk_system.io.datacontroller.EntityDataController entityDataController; //ASP make non-private and non-final
++    protected ca.spottedleaf.moonrise.patches.chunk_system.io.datacontroller.PoiDataController poiDataController; //ASP make non-private and non-final
+     private final ca.spottedleaf.moonrise.patches.chunk_system.io.datacontroller.ChunkDataController chunkDataController;
+-    private final ca.spottedleaf.moonrise.patches.chunk_system.scheduling.ChunkTaskScheduler chunkTaskScheduler;
++    protected final ca.spottedleaf.moonrise.patches.chunk_system.scheduling.ChunkTaskScheduler chunkTaskScheduler; //ASP make non-private
+     private long lastMidTickFailure;
+     private long tickedBlocksOrFluids;
+     private final ca.spottedleaf.moonrise.common.misc.NearbyPlayers nearbyPlayers = new ca.spottedleaf.moonrise.common.misc.NearbyPlayers((ServerLevel)(Object)this);
 @@ -631,7 +631,35 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
      public final MinecraftServer.TickTimes tickTimes60s = new MinecraftServer.TickTimes(1200);
      // DivineMC end - MSPT Tracking for each world
@@ -234,3 +313,32 @@ index dbf5c790012848334acc78f0a217214aa8bef3f7..fb0e739dbc31389b1354a8f7712b1d0f
          this.paperConfig = paperWorldConfigCreator.apply(this.spigotConfig); // Paper - create paper world config
          this.purpurConfig = new org.purpurmc.purpur.PurpurWorldConfig(bukkitName, environment, worldKey); // Purpur - Purpur config files
          // DivineMC start - Configuration
+diff --git a/net/minecraft/world/level/chunk/LevelChunk.java b/net/minecraft/world/level/chunk/LevelChunk.java
+index bd7b7176cc5811be62331b332e7d2e141eaba1fb..1ca581ce14479376e24484826a0889869233fa60 100644
+--- a/net/minecraft/world/level/chunk/LevelChunk.java
++++ b/net/minecraft/world/level/chunk/LevelChunk.java
+@@ -87,7 +87,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource, ca.spot
+     };
+     private final Map<BlockPos, LevelChunk.RebindableTickingBlockEntityWrapper> tickersInLevel = new it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap<>(); // DivineMC - Optimize level ticking
+     private boolean loaded;
+-    private final ServerLevel level; // CraftBukkit - type
++    public final ServerLevel level; // CraftBukkit - type //ASP make non-private
+     private @Nullable Supplier<FullChunkStatus> fullStatus;
+     private LevelChunk.@Nullable PostLoadProcessor postLoad;
+     private final Int2ObjectMap<GameEventListenerRegistry> gameEventListenerRegistrySections;
+diff --git a/net/minecraft/world/level/chunk/storage/SerializableChunkData.java b/net/minecraft/world/level/chunk/storage/SerializableChunkData.java
+index ba516d11006f47fb7e8e7f4d3b5a3c0a8faf80ed..a17f9182ec212b630240f90eb4a5ae4e70a9a641 100644
+--- a/net/minecraft/world/level/chunk/storage/SerializableChunkData.java
++++ b/net/minecraft/world/level/chunk/storage/SerializableChunkData.java
+@@ -694,9 +694,9 @@ public record SerializableChunkData(
+         return tag != null ? tag.read("Status", ChunkStatus.CODEC).orElse(ChunkStatus.EMPTY) : ChunkStatus.EMPTY;
+     }
+ 
+-    private static LevelChunk.@Nullable PostLoadProcessor postLoadChunk(
++    public static LevelChunk.@Nullable PostLoadProcessor postLoadChunk(
+         final ServerLevel level, final List<CompoundTag> entities, final List<CompoundTag> blockEntities
+-    ) {
++    ) { //ASP make non-private
+         return entities.isEmpty() && blockEntities.isEmpty()
+             ? null
+             : levelChunk -> {
