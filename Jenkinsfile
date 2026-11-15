@@ -28,7 +28,15 @@ pipeline {
 
 	post {
 		always {
-			archiveArtifacts artifacts: 'basiclandmc-server/build/libs/basiclandmc-paperclip-*.jar', fingerprint: true
+			archiveArtifacts(
+			    artifacts: '''
+			        basiclandmc-server/build/libs/basiclandmc-paperclip-*.jar,
+                    plugin/build/libs/asp-plugin-*.jar,
+                    api/build/libs/api-*.jar
+			    ''',
+			    excludes: '**/*-sources.jar,**/*-javadoc.jar',
+			    fingerprint: true
+			)
 		}
 	}
 }
