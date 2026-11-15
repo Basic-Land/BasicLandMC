@@ -1,0 +1,18 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 03:14:32 +0100
+Subject: [PATCH] dupe-fix
+
+
+diff --git a/net/minecraft/world/item/ItemStack.java b/net/minecraft/world/item/ItemStack.java
+index b91f1146bd38e9b65832c8295c08ce64a871dc3b..17202dd4f70d98bd9d851136f6656c4e6bd6fa42 100644
+--- a/net/minecraft/world/item/ItemStack.java
++++ b/net/minecraft/world/item/ItemStack.java
+@@ -396,6 +396,7 @@ public final class ItemStack implements DataComponentHolder, net.caffeinemc.mods
+                 interactionResult = item.useOn(context);
+             } finally {
+                 serverLevel.captureBlockStates = false;
++                serverLevel.captureTreeGeneration = false;
+             }
+             DataComponentPatch newPatch = this.components.asPatch();
+             int newCount = this.getCount();
