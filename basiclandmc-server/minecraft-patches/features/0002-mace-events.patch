@@ -1,0 +1,38 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: dan28000 <84990628+dan28000@users.noreply.github.com>
+Date: Sun, 2 Aug 2026 19:21:28 +0200
+Subject: [PATCH] mace-events
+
+
+diff --git a/net/minecraft/world/item/MaceItem.java b/net/minecraft/world/item/MaceItem.java
+index c9e6cf2643333a49cda78bbe2956b0f8a9b8a996..a470c82c905dca5a4c0bbf7a3f4aedfb27e0ba52 100644
+--- a/net/minecraft/world/item/MaceItem.java
++++ b/net/minecraft/world/item/MaceItem.java
+@@ -2,6 +2,8 @@ package net.minecraft.world.item;
+ 
+ import java.util.List;
+ import java.util.function.Predicate;
++
++import cz.basicland.stattrack.MacePlungeEvent;
+ import net.minecraft.core.Direction;
+ import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
+ import net.minecraft.server.level.ServerLevel;
+@@ -119,9 +121,15 @@ public class MaceItem extends Item {
+                     d3 = 22.0 + d2 - 8.0;
+                 }
+ 
+-                return livingEntity.level() instanceof ServerLevel serverLevel
+-                    ? (float)(d3 + EnchantmentHelper.modifyFallBasedDamage(serverLevel, livingEntity.getWeaponItem(), target, damageSource, 0.0F) * d2)
+-                    : (float)d3;
++                if (livingEntity.level() instanceof ServerLevel serverLevel) {
++                    double extra = EnchantmentHelper.modifyFallBasedDamage(serverLevel, livingEntity.getWeaponItem(), target, damageSource, 0.0F) * d2;
++                    float sum = (float) (d3 + extra);
++                    if (livingEntity instanceof ServerPlayer player && sum > 0) new MacePlungeEvent(player.getBukkitEntity(),
++                        livingEntity.getWeaponItem().asBukkitMirror(), d3, extra, d2).callEvent(); // BasicLand - Add DensityDmg event
++                    return sum;
++                } else {
++                    return (float)d3;
++                }
+             }
+         } else {
+             return 0.0F;
