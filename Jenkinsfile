@@ -21,6 +21,7 @@ pipeline {
 					runGradleTask('applyAllPatches')
 					runGradleTask('basiclandmc-server:createPaperclipJar')
 					runGradleTask('publishAllPublicationsToLocalRepository')
+					runGradleTask('build')
 				}
 			}
 	    }
